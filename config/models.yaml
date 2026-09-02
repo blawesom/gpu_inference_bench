@@ -1,0 +1,87 @@
+# gpu_inference_bench — model matrix + per-model optimization configs
+#
+# Consumed by container/run_matrix.py. All flags below are verified against
+# vLLM v0.28.0 (spike, 2026-09-02, ROCm 7.2.3 target).
+#
+# Conventions:
+#   - config `flags:` map to vLLM CLI args: key `kv-cache-dtype: fp8`
+#     becomes `--kv-cache-dtype fp8`. A `true` value becomes a bare `--flag`.
+#   - a config flag can override a model default (e.g. long-context overrides
+#     max-model-len).
+#   - `max_model_len` here is the BASE context length for baseline / kv-fp8;
+#     the long-context config overrides it to 32768.
+
+# ── Workload (identical across all models + vendors for comparability) ──────
+workload:
+  dataset: random
+  random_input_len: 512
+  random_output_len: 256
+  num_prompts: 50
+  num_warmups: 2
+  concurrency_levels: [1, 4, 8, 16]
+  seed: 42
+  temperature: 0.0
+  ignore_eos: true
+  # v0.28.0 bench-serve backend (openai-chat REQUIRES the chat/completions
+  # endpoint; the v0.28 default --endpoint /v1/completions is rejected).
+  backend: openai-chat
+  endpoint: /v1/chat/completions
+  percentile_metrics: "ttft,tpot,itl"
+  metric_percentiles: "50,90,99"
+
+# ── Common server settings (applied to every cell) ──────────────────────────
+common_server:
+  host: 0.0.0.0
+  port: 8000
+  gpu_memory_utilization: 0.90
+  trust_remote_code: true
+  # NOTE: --enable-prefix-caching is intentionally OFF (distorts synthetic
+  # token throughput). Do not enable.
+
+# ── Per-model optimization configs ──────────────────────────────────────────
+configs:
+  baseline:
+    flags: {}
+  kv-fp8:
+    flags:
+      kv-cache-dtype: fp8
+  long-context:
+    flags:
+      max-model-len: 32768
+
+# ── Model matrix (all must fit the 32 GB floor) ─────────────────────────────
+models:
+  M1:
+    id: Qwen/Qwen3.5-9B
+    class: dense-9b
+    format: bf16
+    weights_gb: 19.3
+    max_model_len: 8192
+    configs: [baseline, kv-fp8, long-context]
+
+  M2:
+    id: openai/gpt-oss-20b
+    class: moe-small
+    format: mxfp4
+    weights_gb: 13.8
+    max_model_len: 8192
+    # No speculative decoding: MTP unsupported for GptOssForCausalLM in
+    # v0.28.0 (verified in spike); ngram not a meaningful axis on random data.
+    configs: [baseline, kv-fp8]
+
+  M3:
+    id: cyankiwi/Qwen3.8-27B-AWQ-INT4
+    class: dense-27b
+    format: awq4
+    weights_gb: 21.0
+    max_model_len: 8192
+    configs: [baseline, kv-fp8, long-context]
+
+  M4:
+    id: Qwen/Qwen3.5-35B-A3B-GPTQ-Int4
+    class: moe-35b-a3b
+    format: gptq4
+    weights_gb: 24.4
+    max_model_len: 8192
+    # No speculative decoding (no MTP head in config; ngram not meaningful).
+    configs: [baseline, kv-fp8]
