@@ -172,6 +172,9 @@ OUT=/out
 cd "$OUT"
 mkdir -p "$OUT"
 
+# fresh summary + logs for this run (spike-out persists across runs on the host)
+rm -f "$OUT"/summary.txt "$OUT"/s1-* "$OUT"/s2-* "$OUT"/s3-* "$OUT"/s4-* "$OUT"/s5-* 2>/dev/null || true
+
 # every step writes logs to /out; STATUS lines in summary.txt are greppable
 step_begin() { echo "==== S$1 $2 ====" | tee -a summary.txt; }
 step_ok()    { echo "STATUS: S$1 $2: OK — ${3:-}" | tee -a summary.txt; }
