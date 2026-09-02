@@ -1,0 +1,8 @@
+# runtime artifacts
+results/
+spike-out/
+spike-hf-cache/
+
+# python
+__pycache__/
+*.pyc
