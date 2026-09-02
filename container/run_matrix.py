@@ -12,13 +12,14 @@ Runs INSIDE the vLLM container. For each (model, config) cell:
 Output (in a per-run dir /results/<YYYYMMDD-HHMMSS>_<gpu-slug>/, created
 after GPU selection so repeated runs never collide; /results/.latest holds
 the run-id basename for entrypoint.sh / bench.sh):
+  environment.json                     host + GPU + image + vLLM versions
   server_<model>_<config>.log          raw vLLM server log per cell
   bench_<model>_<config>_<C>.json      raw `vllm bench serve` output
   telemetry_<model>_<config>_<C>.json  1 Hz GPU samples for that level
-  cells.json                           manifest consumed by report.py
+  cells.json                           manifest (workload/models/cells) consumed by report.py
 
 Usage (from entrypoint.sh):
-  python3 /bench/run_matrix.py \
+  python3 /bench/container/run_matrix.py \
       --config /bench/config/models.yaml \
       --results /results \
       --vendor amd [--models M1,M2] [--keep-weights] [--quick]
@@ -114,6 +115,119 @@ def gpu_name(vendor: str, idx: int | None = None) -> str:
                 return m.group(1).strip()
         return "intel-gpu"
     return f"{vendor}-gpu"
+
+
+# ── Environment metadata (→ environment.json) ─────────────────────────────────
+def _first_line(cmd: list[str]) -> str | None:
+    out = _run_cmd(cmd)
+    if not out:
+        return None
+    for line in out.splitlines():
+        if line.strip():
+            return line.strip()
+    return None
+
+
+def _read_file(path: str) -> str | None:
+    try:
+        with open(path, errors="replace") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def _torch_stack() -> tuple[str | None, str | None]:
+    """(cuda, hip) runtime versions from the image's torch, best-effort."""
+    out = _run_cmd(["python3", "-c",
+                    "import torch; print(repr(torch.version.cuda or '')); "
+                    "print(repr(torch.version.hip or ''))"], timeout=60.0)
+    lines = (out or "").splitlines()
+    cuda = lines[0].strip("'\" ") if len(lines) > 0 else None
+    hip = lines[1].strip("'\" ") if len(lines) > 1 else None
+    return (cuda or None, hip or None)
+
+
+def collect_environment(vendor: str, gpu_index: int | None, gpu: str) -> dict:
+    """Best-effort environment metadata for environment.json. Never raises.
+
+    Host-side facts that the container cannot see (host OS, docker version,
+    image name/digest) come via env vars set by bench.sh.
+    """
+    vendor = (vendor or "auto").lower()
+    env: dict = {
+        "vendor": vendor,
+        "gpu": gpu,
+        "gpu_index_in_container": gpu_index,
+        "vram_total_gb": None,
+        "driver": None,
+        "stack": {"cuda": None, "rocm": None, "xpu": None},
+        "os": os.environ.get("HOST_OS") or None,
+        "kernel": _first_line(["uname", "-r"]),
+        "cpu": None,
+        "cpu_cores": os.cpu_count(),
+        "ram_gb": None,
+        "gpu_kernel_modules": [],
+        "docker_version": os.environ.get("DOCKER_VERSION") or None,
+        "image": os.environ.get("IMAGE") or None,
+        "image_id": os.environ.get("IMAGE_DIGEST") or None,
+        "vllm_version": None,
+    }
+    if vendor == "nvidia":
+        i = str(gpu_index if gpu_index is not None else 0)
+        out = _run_cmd(["nvidia-smi", "--query-gpu=driver_version,memory.total",
+                        "--format=csv,noheader,nounits", "-i", i], timeout=30.0)
+        if out:
+            parts = [p.strip() for p in out.split(",")]
+            if parts and parts[0]:
+                env["driver"] = parts[0]
+            if len(parts) > 1:
+                try:
+                    env["vram_total_gb"] = round(float(parts[1]) / 1024.0, 1)
+                except ValueError:
+                    pass
+    elif vendor == "amd":
+        env2 = {k: v for k, v in os.environ.items() if k != "HIP_VISIBLE_DEVICES"}
+        out = _run_cmd(["rocm-smi", "--showdriverversion"], env=env2, timeout=30.0)
+        m = re.search(r"(\d+\.\d+(?:\.\d+)?)", out or "")
+        if m:
+            env["driver"] = m.group(1)
+        out = _run_cmd(["rocm-smi", "--showmeminfo", "vram"], env=env2, timeout=30.0)
+        pat = (rf"GPU\[{gpu_index}\].*?VRAM Total Memory \(B\): (\d+)"
+               if gpu_index is not None
+               else r"GPU\[\d+\].*?VRAM Total Memory \(B\): (\d+)")
+        m = re.search(pat, out or "")
+        if m:
+            env["vram_total_gb"] = round(int(m.group(1)) / 1024 ** 3, 1)
+    elif vendor == "intel":
+        out = _run_cmd(["xpu-smi", "discovery"], timeout=30.0)
+        m = re.search(
+            r"^\s*\|(?:\s*(?:iGPU|dGPU|Discrete GPU))\s*\|\s*\d+\s*\|[^|]*\|\s*([^|]+?)\s*\|",
+            out or "", re.M)
+        if m:
+            env["driver"] = m.group(1)
+            env["stack"]["xpu"] = m.group(1)
+
+    cuda, hip = _torch_stack()
+    env["stack"]["cuda"] = cuda
+    env["stack"]["rocm"] = hip
+
+    m = re.search(r"model name\s*:\s*(.+)", _read_file("/proc/cpuinfo") or "")
+    if m:
+        env["cpu"] = m.group(1).strip()
+    m = re.search(r"MemTotal:\s*(\d+)", _read_file("/proc/meminfo") or "")
+    if m:
+        env["ram_gb"] = round(int(m.group(1)) / 1024 / 1024, 1)
+    mod_names = {l.split()[0] for l in (_read_file("/proc/modules") or "")
+                 .splitlines() if l.split()}
+    known = ("nvidia", "nvidia_uvm", "nvidia_drm", "nvidia_modeset",
+             "amdgpu", "amdkcl", "xe", "i915")
+    env["gpu_kernel_modules"] = sorted(mod_names & set(known))
+
+    out = _run_cmd(["vllm", "--version"], timeout=60.0)
+    m = re.search(r"(\d+\.\d+\.\d+\S*)", out or "")
+    if m:
+        env["vllm_version"] = m.group(1)
+    return env
 
 
 def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
@@ -466,6 +580,13 @@ def main() -> int:
             run_dir, n = results / f"{base}-{n}", n + 1
         run_dir.mkdir(parents=True)
         print(f"[run_matrix] run dir: {run_dir}")
+        try:
+            env_info = collect_environment(args.vendor, gpu_index, gpu)
+            (run_dir / "environment.json").write_text(
+                json.dumps(env_info, indent=2) + "\n")
+            print(f"[run_matrix] environment → {run_dir / 'environment.json'}")
+        except Exception as e:  # environment is best-effort, never fatal
+            print(f"WARN: environment collection failed: {e}", file=sys.stderr)
 
     all_cells: list[dict] = []
     for mk in model_keys:
@@ -485,14 +606,31 @@ def main() -> int:
     for c in all_cells:
         if gpu:
             c["gpu"] = gpu
-    (run_dir / "cells.json").write_text(json.dumps(all_cells, indent=2))
+    manifest = {
+        "schema_version": 1,
+        "run_id": run_dir.name,
+        "workload": workload,
+        "common_server": common,
+        "models": {mk: models[mk] for mk in model_keys if mk in models},
+        "cells": all_cells,
+    }
+    (run_dir / "cells.json").write_text(json.dumps(manifest, indent=2))
     if not args.dry_run:
         # pointer for entrypoint.sh / bench.sh (basename only — each side
         # joins with its own $RESULTS path)
         (results / ".latest").write_text(run_dir.name + "\n")
-    n_ok = sum(1 for c in all_cells if c["status"] == "ok")
+
+    def _cell_failed(c: dict) -> bool:
+        """Cell failed if its status is failed OR any concurrency level
+        failed (server can be healthy while a bench run crashes)."""
+        if c["status"] == "failed":
+            return True
+        return any(l.get("status") == "failed"
+                   for l in c.get("concurrency_results", {}).values())
+
+    n_ok = sum(1 for c in all_cells if c["status"] == "ok" and not _cell_failed(c))
     n_skip = sum(1 for c in all_cells if c["status"].startswith("skipped"))
-    n_fail = sum(1 for c in all_cells if c["status"] == "failed")
+    n_fail = sum(1 for c in all_cells if _cell_failed(c))
     print(f"\n[run_matrix] {n_ok} ok, {n_skip} skipped, {n_fail} failed "
           f"of {len(all_cells)} cells → {run_dir / 'cells.json'}")
     print(f"[run_matrix] RUN_DIR={run_dir}")
