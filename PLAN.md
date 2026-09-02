@@ -90,6 +90,7 @@ Single-GPU scope: index 0 only, **except when multiple devices are present → p
 - CPU model + core count, host RAM
 - Docker version, **image name + pinned tag + image digest**
 - vLLM version (`vllm --version` in container)
+- **Visible GPU in container** (runtime-verified: `nvidia-smi` / `rocm-smi --showproductname` / `ls /dev/dri`) — confirms the host-side largest-VRAM selection actually landed
 
 ---
 

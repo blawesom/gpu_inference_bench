@@ -57,39 +57,61 @@ VENDOR="$(detect_vendor)" || { log "ERROR: no supported GPU detected (lspci / nv
 log "vendor: $VENDOR"
 
 # Pick the GPU with the most VRAM when multiple devices are present.
-# Result: GPU_IDX (device index inside the container) + GPU_DESC (for logging)
+# Output: GPU_IDX (index for the vendor env var), GPU_DESC, GPU_VRAM_MB
+MIN_VRAM_MB=24576   # 24 GB escape gate (intel exempt: no reliable host query)
 pick_gpu() {
-  case "$1" in
+  local vendor="$1"
+  GPU_IDX=0; GPU_VRAM_MB=0; GPU_DESC="unknown"
+  case "$vendor" in
     nvidia)
-      # nvidia-smi: index, name, total VRAM in MiB
-      local line idx vram best=-1 bestidx=0 bestdesc=""
+      local idx name vram best=-1
       while IFS=, read -r idx name vram _; do
-        idx=${idx// /}; vram=${vram// /}
-        if (( vram > best )); then best=$vram; bestidx=$idx; bestdesc="$name ($vram MiB)"; fi
+        idx=${idx// /}; name=${name// /}; vram=${vram// /}
+        [[ $vram =~ ^[0-9]+$ ]] || continue
+        (( vram > best )) || continue
+        best=$vram; GPU_IDX=$idx; GPU_DESC="${name} ($vram MiB)"
       done < <(nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader,nounits 2>/dev/null)
-      GPU_IDX=$bestidx; GPU_DESC="$bestdesc" ;;
+      GPU_VRAM_MB=$best
+      ;;
     amd)
-      # prefer sysfs mem_info_vram_total (bytes); fallback: rocm-smi json; fallback: 0
-      local card f best=-1 bestidx=0 bestdesc=""
-      for f in /sys/class/drm/card*/device/mem_info_vram_total; do
-        [[ -r $f ]] || continue
-        card=${f#/sys/class/drm/card}; card=${card%%/*}
-        local vram; vram=$(<"$f")
-        if (( vram > best )); then best=$vram; bestidx=$card; bestdesc="card$card ($(( vram / 1024 / 1024 )) MiB)"; fi
-      done
-      if (( best < 0 )) && command -v rocm-smi >/dev/null 2>&1; then
-        local line idx vram
-        while IFS=, read -r idx vram _; do
-          idx=${idx//\"/}; idx=${idx// /}; vram=${vram// /}
-          [[ $idx =~ ^[0-9]+$ ]] || continue
-          if (( vram > best )); then best=$vram; bestidx=$idx; bestdesc="gpu$idx ($(( vram / 1024 / 1024 )) MiB)"; fi
-        done < <(rocm-smi --showmeminfo vram --csv 2>/dev/null | tail -n +2)
+      # Primary: rocm-smi — its GPU index IS the HIP_VISIBLE_DEVICES index.
+      # ("GPU","VRAM Total Memory (B)","VRAM Total Used Memory (B)")
+      local idx vram best=-1
+      while IFS=, read -r idx vram _; do
+        idx=${idx//\"/}; idx=${idx// /}; vram=${vram//\"/}; vram=${vram// /}
+        [[ $idx =~ ^[0-9]+$ && $vram =~ ^[0-9]+$ ]] || continue
+        (( vram > best )) || continue
+        best=$(( vram / 1048576 )); GPU_IDX=$idx
+      done < <(rocm-smi --showmeminfo vram --csv 2>/dev/null | tail -n +2)
+      if (( best > 0 )); then
+        GPU_VRAM_MB=$best; GPU_DESC="rocm-smi gpu$GPU_IDX ($best MiB)"
+      else
+        # Fallback: sysfs (card number ~= HIP index; warn on multi-card)
+        local f card vram_b
+        for f in /sys/class/drm/card*/device/mem_info_vram_total; do
+          [[ -r $f ]] || continue
+          card=${f#/sys/class/drm/card}; card=${card%%/*}
+          vram_b=$(<"$f")
+          [[ $vram_b =~ ^[0-9]+$ ]] || continue
+          if (( vram_b > best )); then best=$(( vram_b / 1048576 )); GPU_IDX=$card; fi
+        done
+        GPU_VRAM_MB=$best; GPU_DESC="sysfs card$GPU_IDX (${best} MiB)"
+        local ncards; ncards=$(ls -d /sys/class/drm/card* 2>/dev/null | wc -l)
+        (( ncards > 1 )) && log "WARN: AMD multi-card via sysfs fallback — card/HIP index may differ"
       fi
-      GPU_IDX=$bestidx; GPU_DESC="${bestdesc:-card0 (size unknown)}" ;;
+      ;;
     intel)
       local n; n=$(ls /dev/dri/renderD* 2>/dev/null | wc -l)
-      GPU_IDX=0; GPU_DESC="render node 0 ($n render device(s); multi-XPU not resolved)" ;;
+      GPU_DESC="render node 0 ($n render device(s))"
+      GPU_VRAM_MB=999999   # no reliable host-side VRAM query; exempt from gate
+      ;;
   esac
+
+  if [[ "$vendor" != "intel" ]] && (( GPU_VRAM_MB < MIN_VRAM_MB )); then
+    log "ERROR: selected GPU has ${GPU_VRAM_MB} MiB VRAM (< 24 GB minimum) — aborting."
+    log "GPU: $GPU_DESC. This benchmark targets 32-40 GB GPUs."
+    exit 1
+  fi
 }
 pick_gpu "$VENDOR"
 log "gpu: index $GPU_IDX — $GPU_DESC"
@@ -105,7 +127,6 @@ command -v docker >/dev/null 2>&1 || { log "ERROR: docker not found"; exit 1; }
 AVAIL_GB=$(df -BG . | awk 'NR==2 {gsub("G",""); print $4}')
 (( AVAIL_GB >= 45 )) || { log "ERROR: need ≥ 45 GB free on this disk (got ${AVAIL_GB} GB)"; exit 1; }
 log "disk: ${AVAIL_GB} GB free"
-
 mkdir -p "$OUT_DIR" "$HF_CACHE"
 log "pulling image..."
 docker pull "$IMAGE"
@@ -156,6 +177,11 @@ step_begin 1 "vllm version + bench command discovery"
   python3 -c "import torch; print('torch', torch.__version__)" 2>&1 || true
   echo "--- which vllm ---"
   command -v vllm || true
+  echo "--- visible GPU (runtime verification of host-side selection) ---"
+  nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader 2>/dev/null \
+    || rocm-smi --showproductname --showmeminfo vram 2>/dev/null \
+    || /opt/rocm/bin/rocm-smi --showproductname --showmeminfo vram 2>/dev/null \
+    || { echo "(no host gpu tool); /dev/dri:"; ls -la /dev/dri 2>/dev/null; }
   echo "--- try: vllm bench serve --help ---"
   vllm bench serve --help 2>&1 | head -40
   echo "--- try: python3 -m vllm.benchmark.serve --help ---"
