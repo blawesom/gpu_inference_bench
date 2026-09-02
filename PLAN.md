@@ -171,14 +171,20 @@ concurrency sweep. Matrix defined in `config/models.yaml`:
 | Model | Configs tested |
 |-------|----------------|
 | M1 Qwen3.5-9B (dense)       | `baseline` · `kv-fp8` (`--kv-cache-dtype fp8`) · `long-context` (`--max-model-len 32768`, chunked prefill default on) |
-| M2 gpt-oss-20b (MoE)        | `baseline` · `kv-fp8` · `spec-mtp` (native MTP speculative decoding²) |
+| M2 gpt-oss-20b (MoE)        | `baseline` · `kv-fp8` · `spec-mtp` (auto-skipped — vLLM 0.28.0 has no MTP support for `GptOssForCausalLM`²) |
 | M3 Qwen3.8-27B-AWQ (dense)  | `baseline` · `kv-fp8` · `long-context` |
 | M4 Qwen3.5-35B-A3B-GPTQ (MoE) | `baseline` · `kv-fp8` · `spec-mtp` (auto-skipped — no MTP head in config³) |
 
-² Only `gpt-oss-20b` in the matrix has a verified MTP head
-   (`GptOssForCausalLM`, natively supported by the vLLM gpt-oss backend).
-   Exact flag to verify in spike: `--speculative-config '{"method": "mtp", "num_speculative_tokens": 1, ...}'`
-   and record the effective flags in the report.
+² **Spike run 1 (2026-09-02, vLLM 0.28.0+rocm723): gpt-oss-20b has no MTP
+   support.** `--speculative-config.method mtp` → `NotImplementedError:
+   Unsupported speculative method: 'mtp'` at argument validation (vLLM has
+   no MTP handler for `GptOssForCausalLM`); `gpt_oss_mtp` is not a valid
+   method literal. MTP method names in v0.28.0 are model-specific
+   (`qwen3_5_mtp`, `qwen3_next_mtp`, `deepseek_mtp`, …). The orchestrator
+   pre-check (³) catches this without launching a server (gpt-oss
+   config.json has no `num_nextn_predict_layers`). `ngram` is a valid
+   generic speculative method (accepted, server started in the spike;
+   its S4 bench was blocked only by host disk space).
 
 ³ Pre-check: the orchestrator reads the HF `config.json` of each model before
    starting a server; `num_nextn_predict_layers` absent ⇒ `spec-mtp` marked
@@ -398,7 +404,12 @@ VRAM floor 32 GB (32–40 GB fleet) · **full matrix is the default (~4 h)** ·
 power metrics **best-effort** (null when the vendor tool lacks them) ·
 per-machine standalone reports (no cross-run diff mode).
 
-**No open items — ready to implement.**
+**Open:** spec-mtp is dead for all four matrix models (spike run 1: no MTP
+support for gpt-oss-20b in v0.28.0; M4 has no MTP head) — replace the cell
+with `spec-ngram` (valid generic method, verified accepted in the spike) to
+keep exercising speculative-config plumbing, or drop the column.
+
+**No other open items — ready to implement.**
 
 ---
 
@@ -420,3 +431,5 @@ per-machine standalone reports (no cross-run diff mode).
 ---
 
 *Draft v3.1 — 2026-09-02 (final: cyankiwi 27B, Qwen 35B cross-vendor, 32–40 GB fleet, full-matrix default, per-model weight deletion, best-effort power metrics, per-machine standalone reports; latest-gen models; measured on-disk sizes; MTP pre-check; NVFP4 cross-vendor exclusion)*
+*
+*v3.2 — 2026-09-02 (spike run 1 on ROCm 7.2.3 target: MTP not supported for gpt-oss-20b in vLLM 0.28.0 → M2 spec-mtp now auto-skipped; open item: spec-mtp column vs spec-ngram; bench JSON schema + fp8-KV support pending spike run 2)*
