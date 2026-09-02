@@ -26,6 +26,7 @@ set -euo pipefail
 
 SKIP_GPT_OSS=0
 IMAGE_TAG="${IMAGE_TAG:-v0.28.0}"
+FORCE_GPU_IDX=""
 OUT_DIR="$(pwd)/spike-out"
 HF_CACHE="$(pwd)/spike-hf-cache"
 
@@ -33,6 +34,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-gpt-oss) SKIP_GPT_OSS=1; shift ;;
     --image-tag)    IMAGE_TAG="$2"; shift 2 ;;
+    --gpu-index)    FORCE_GPU_IDX="$2"; shift 2 ;;
     -h|--help)      sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
@@ -68,21 +70,37 @@ pick_gpu() {
       while IFS=, read -r idx name vram _; do
         idx=${idx// /}; name=${name// /}; vram=${vram// /}
         [[ $vram =~ ^[0-9]+$ ]] || continue
-        (( vram > best )) || continue
-        best=$vram; GPU_IDX=$idx; GPU_DESC="${name} ($vram MiB)"
+        [[ -n "$FORCE_GPU_IDX" && "$idx" != "$FORCE_GPU_IDX" ]] && continue
+        if [[ -n "$FORCE_GPU_IDX" ]]; then
+          best=$vram; GPU_IDX=$idx; GPU_DESC="${name} ($vram MiB, forced)"
+        else
+          (( vram > best )) || continue
+          best=$vram; GPU_IDX=$idx; GPU_DESC="${name} ($vram MiB)"
+        fi
       done < <(nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader,nounits 2>/dev/null)
       GPU_VRAM_MB=$best
       ;;
     amd)
       # Primary: rocm-smi — its GPU index IS the HIP_VISIBLE_DEVICES index.
       # ("GPU","VRAM Total Memory (B)","VRAM Total Used Memory (B)")
+      local rocm_bin=""
+      if command -v rocm-smi >/dev/null 2>&1; then rocm_bin=rocm-smi
+      elif [[ -x /opt/rocm/bin/rocm-smi ]]; then rocm_bin=/opt/rocm/bin/rocm-smi
+      fi
       local idx vram best=-1
-      while IFS=, read -r idx vram _; do
-        idx=${idx//\"/}; idx=${idx// /}; vram=${vram//\"/}; vram=${vram// /}
-        [[ $idx =~ ^[0-9]+$ && $vram =~ ^[0-9]+$ ]] || continue
-        (( vram > best )) || continue
-        best=$(( vram / 1048576 )); GPU_IDX=$idx
-      done < <(rocm-smi --showmeminfo vram --csv 2>/dev/null | tail -n +2)
+      if [[ -n "$rocm_bin" ]]; then
+        while IFS=, read -r idx vram _; do
+          idx=${idx//\"/}; idx=${idx// /}; vram=${vram//\"/}; vram=${vram// /}
+          [[ $idx =~ ^[0-9]+$ && $vram =~ ^[0-9]+$ ]] || continue
+          [[ -n "$FORCE_GPU_IDX" && "$idx" != "$FORCE_GPU_IDX" ]] && continue
+          if [[ -n "$FORCE_GPU_IDX" ]]; then
+            best=$(( vram / 1048576 )); GPU_IDX=$idx
+          else
+            (( vram > best )) || continue
+            best=$(( vram / 1048576 )); GPU_IDX=$idx
+          fi
+        done < <("$rocm_bin" --showmeminfo vram --csv 2>/dev/null | tail -n +2)
+      fi
       if (( best > 0 )); then
         GPU_VRAM_MB=$best; GPU_DESC="rocm-smi gpu$GPU_IDX ($best MiB)"
       else
@@ -91,13 +109,14 @@ pick_gpu() {
         for f in /sys/class/drm/card*/device/mem_info_vram_total; do
           [[ -r $f ]] || continue
           card=${f#/sys/class/drm/card}; card=${card%%/*}
+          [[ -n "$FORCE_GPU_IDX" && "$card" != "$FORCE_GPU_IDX" ]] && continue
           vram_b=$(<"$f")
           [[ $vram_b =~ ^[0-9]+$ ]] || continue
           if (( vram_b > best )); then best=$(( vram_b / 1048576 )); GPU_IDX=$card; fi
         done
         GPU_VRAM_MB=$best; GPU_DESC="sysfs card$GPU_IDX (${best} MiB)"
         local ncards; ncards=$(ls -d /sys/class/drm/card* 2>/dev/null | wc -l)
-        (( ncards > 1 )) && log "WARN: AMD multi-card via sysfs fallback — card/HIP index may differ"
+        (( ncards > 1 )) && log "WARN: AMD multi-card via sysfs fallback — card/HIP index may differ;\n  in-container verification (S1) will catch a mismatch; force with --gpu-index N"
       fi
       ;;
     intel)
@@ -142,7 +161,10 @@ docker run -i --rm \
   -v "$HF_CACHE:/hf-cache" \
   -e HF_HOME=/hf-cache \
   -e "${GPU_ENV[@]}" \
+  -e EXPECTED_VRAM_MB="$GPU_VRAM_MB" \
+  -e EXPECTED_GPU_IDX="$GPU_IDX" \
   -e SKIP_GPT_OSS="$SKIP_GPT_OSS" \
+  -e GPU_VENDOR="$VENDOR" \
   "$IMAGE" -s <<'EOSPIKE'
 set -u
 OUT=/out
@@ -182,6 +204,32 @@ step_begin 1 "vllm version + bench command discovery"
     || rocm-smi --showproductname --showmeminfo vram 2>/dev/null \
     || /opt/rocm/bin/rocm-smi --showproductname --showmeminfo vram 2>/dev/null \
     || { echo "(no host gpu tool); /dev/dri:"; ls -la /dev/dri 2>/dev/null; }
+  # hard check: container-visible VRAM must match the host's selection
+  visible_vram_mb=""
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    visible_vram_mb=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)   # MiB
+  elif command -v rocm-smi >/dev/null 2>&1; then
+    vram_b=$(rocm-smi --showmeminfo vram --csv 2>/dev/null | tail -n +2 | head -1 | cut -d, -f2 | tr -d '" ')
+    [[ $vram_b =~ ^[0-9]+$ ]] && visible_vram_mb=$(( vram_b / 1048576 ))                                        # B -> MiB
+  elif [[ -x /opt/rocm/bin/rocm-smi ]]; then
+    vram_b=$(/opt/rocm/bin/rocm-smi --showmeminfo vram --csv 2>/dev/null | tail -n +2 | head -1 | cut -d, -f2 | tr -d '" ')
+    [[ $vram_b =~ ^[0-9]+$ ]] && visible_vram_mb=$(( vram_b / 1048576 ))
+  fi
+  if [[ "${visible_vram_mb:-}" =~ ^[0-9]+$ ]] && (( visible_vram_mb > 0 )); then
+    expected="${EXPECTED_VRAM_MB:-0}"
+    if (( expected > 0 )); then
+      lo=$(( expected * 90 / 100 )); hi=$(( expected * 110 / 100 ))
+      if (( visible_vram_mb >= lo && visible_vram_mb <= hi )); then
+        step_ok 1 "visible GPU" "${visible_vram_mb} MiB matches host selection (${expected} MiB @ idx ${EXPECTED_GPU_IDX:-?})"
+      else
+        step_fail 1 "visible GPU" "MISMATCH: container sees ${visible_vram_mb} MiB, host picked ${expected} MiB (idx ${EXPECTED_GPU_IDX:-?}) — card/HIP index mismatch; rerun with --gpu-index"
+      fi
+    else
+      step_ok 1 "visible GPU" "${visible_vram_mb} MiB (no host expectation to verify against)"
+    fi
+  else
+    step_fail 1 "visible GPU" "could not query visible GPU VRAM in container"
+  fi
   echo "--- try: vllm bench serve --help ---"
   vllm bench serve --help 2>&1 | head -40
   echo "--- try: python3 -m vllm.benchmark.serve --help ---"
