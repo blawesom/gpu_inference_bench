@@ -10,8 +10,8 @@
 #   S2  baseline: serve Qwen3.5-4B, one small bench run, capture the
 #       result JSON schema
 #   S3  `--kv-cache-dtype fp8`: does the server start? (error captured if not)
-#   S4  MTP speculative decoding on gpt-oss-20b (tries candidate flag values;
-#       the vLLM error message lists supported method names if the guess fails)
+#   S4  speculative decoding on gpt-oss-20b with ngram (MTP is not
+#       supported for GptOssForCausalLM in v0.28.0 — verified, not attempted)
 #   S5  telemetry tools available in-container (nvidia-smi / rocm-smi /
 #       intel_gpu_top) and whether a power field exists
 #
@@ -372,12 +372,15 @@ else
 fi
 kill_server
 
-# ── S4: MTP speculative decoding on gpt-oss-20b ──────────────────────────────
+# ── S4: speculative decoding on gpt-oss-20b (ngram) ─────────────────────────
+# MTP is NOT supported for GptOssForCausalLM in v0.28.0 (verified run 1:
+# 'mtp' → NotImplementedError, 'gpt_oss_mtp' not a valid method literal),
+# so it is not attempted for this model. ngram is the valid generic method.
 if [[ "$SKIP_GPT_OSS" == "1" ]]; then
-  step_begin 4 "MTP spec decode (gpt-oss-20b)"; step_fail 4 "skipped" "--skip-gpt-oss"
+  step_begin 4 "spec decode (gpt-oss-20b)"; step_fail 4 "skipped" "--skip-gpt-oss"
 else
-  step_begin 4 "MTP spec decode (gpt-oss-20b)"
-  for METHOD in mtp gpt_oss_mtp ngram; do
+  step_begin 4 "spec decode (gpt-oss-20b)"
+  for METHOD in ngram; do
     # Use the dotted config syntax (explicitly supported by vLLM's
     # FlexibleArgumentParser) instead of one big JSON arg — more robust
     # across CLI wrappers/backends. Resolved command is logged for post-mortem.
