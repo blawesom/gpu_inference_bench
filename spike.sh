@@ -56,10 +56,48 @@ detect_vendor() {
 VENDOR="$(detect_vendor)" || { log "ERROR: no supported GPU detected (lspci / nvidia-smi / /dev/dri)"; exit 1; }
 log "vendor: $VENDOR"
 
+# Pick the GPU with the most VRAM when multiple devices are present.
+# Result: GPU_IDX (device index inside the container) + GPU_DESC (for logging)
+pick_gpu() {
+  case "$1" in
+    nvidia)
+      # nvidia-smi: index, name, total VRAM in MiB
+      local line idx vram best=-1 bestidx=0 bestdesc=""
+      while IFS=, read -r idx name vram _; do
+        idx=${idx// /}; vram=${vram// /}
+        if (( vram > best )); then best=$vram; bestidx=$idx; bestdesc="$name ($vram MiB)"; fi
+      done < <(nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader,nounits 2>/dev/null)
+      GPU_IDX=$bestidx; GPU_DESC="$bestdesc" ;;
+    amd)
+      # prefer sysfs mem_info_vram_total (bytes); fallback: rocm-smi json; fallback: 0
+      local card f best=-1 bestidx=0 bestdesc=""
+      for f in /sys/class/drm/card*/device/mem_info_vram_total; do
+        [[ -r $f ]] || continue
+        card=${f#/sys/class/drm/card}; card=${card%%/*}
+        local vram; vram=$(<"$f")
+        if (( vram > best )); then best=$vram; bestidx=$card; bestdesc="card$card ($(( vram / 1024 / 1024 )) MiB)"; fi
+      done
+      if (( best < 0 )) && command -v rocm-smi >/dev/null 2>&1; then
+        local line idx vram
+        while IFS=, read -r idx vram _; do
+          idx=${idx//\"/}; idx=${idx// /}; vram=${vram// /}
+          [[ $idx =~ ^[0-9]+$ ]] || continue
+          if (( vram > best )); then best=$vram; bestidx=$idx; bestdesc="gpu$idx ($(( vram / 1024 / 1024 )) MiB)"; fi
+        done < <(rocm-smi --showmeminfo vram --csv 2>/dev/null | tail -n +2)
+      fi
+      GPU_IDX=$bestidx; GPU_DESC="${bestdesc:-card0 (size unknown)}" ;;
+    intel)
+      local n; n=$(ls /dev/dri/renderD* 2>/dev/null | wc -l)
+      GPU_IDX=0; GPU_DESC="render node 0 ($n render device(s); multi-XPU not resolved)" ;;
+  esac
+}
+pick_gpu "$VENDOR"
+log "gpu: index $GPU_IDX — $GPU_DESC"
+
 case "$VENDOR" in
-  nvidia) IMAGE="vllm/vllm-openai:$IMAGE_TAG";     GPU_FLAGS=(--gpus all) ;;
-  amd)    IMAGE="vllm/vllm-openai-rocm:$IMAGE_TAG"; GPU_FLAGS=(--device=/dev/kfd --device=/dev/dri --group-add=video --security-opt seccomp=unconfined) ;;
-  intel)  IMAGE="vllm/vllm-openai-xpu:$IMAGE_TAG";  GPU_FLAGS=(--device=/dev/dri --group-add=video) ;;
+  nvidia) IMAGE="vllm/vllm-openai:$IMAGE_TAG";     GPU_FLAGS=(--gpus "device=$GPU_IDX") ; GPU_ENV=(CUDA_VISIBLE_DEVICES=$GPU_IDX) ;;
+  amd)    IMAGE="vllm/vllm-openai-rocm:$IMAGE_TAG"; GPU_FLAGS=(--device=/dev/kfd --device=/dev/dri --group-add=video --security-opt seccomp=unconfined); GPU_ENV=(HIP_VISIBLE_DEVICES=$GPU_IDX) ;;
+  intel)  IMAGE="vllm/vllm-openai-xpu:$IMAGE_TAG";  GPU_FLAGS=(--device=/dev/dri --group-add=video); GPU_ENV=(ONEAPI_DEVICE_SELECTOR=0) ;;
 esac
 log "image: $IMAGE"
 
@@ -76,14 +114,15 @@ log "running spike container (~30-45 min). Ctrl-C kills container only."
 docker run --rm \
   --name gpu-bench-spike \
   --init \
+  --entrypoint bash \
   "${GPU_FLAGS[@]}" \
   --shm-size 16g \
   -v "$OUT_DIR:/out" \
   -v "$HF_CACHE:/hf-cache" \
   -e HF_HOME=/hf-cache \
+  -e "${GPU_ENV[@]}" \
   -e SKIP_GPT_OSS="$SKIP_GPT_OSS" \
-  "$IMAGE" \
-  bash -s <<'EOSPIKE'
+  "$IMAGE" -s <<'EOSPIKE'
 set -u
 OUT=/out
 cd "$OUT"
@@ -205,11 +244,18 @@ if [[ "$SKIP_GPT_OSS" == "1" ]]; then
 else
   step_begin 4 "MTP spec decode (gpt-oss-20b)"
   for METHOD in mtp gpt_oss_mtp ngram; do
-    SPEC_CFG="{\"method\": \"${METHOD}\", \"num_speculative_tokens\": 1}"
-    vllm serve openai/gpt-oss-20b \
-      --port 8000 --max-model-len 4096 --gpu-memory-utilization 0.85 \
-      --speculative-config "$SPEC_CFG" --trust-remote-code > "s4-serve-${METHOD}.log" 2>&1 &
+    # Use the dotted config syntax (explicitly supported by vLLM's
+    # FlexibleArgumentParser) instead of one big JSON arg — more robust
+    # across CLI wrappers/backends. Resolved command is logged for post-mortem.
+    S4_CMD=(vllm serve openai/gpt-oss-20b
+            --port 8000 --max-model-len 4096 --gpu-memory-utilization 0.85
+            --speculative-config.method "$METHOD"
+            --speculative-config.num_speculative_tokens 1
+            --trust-remote-code)
+    { printf '%q ' "${S4_CMD[@]}"; echo; } > "s4-serve-${METHOD}.log"
+    "${S4_CMD[@]}" >> "s4-serve-${METHOD}.log" 2>&1 &
     SRV_PID=$!
+    sleep 3   # let argparse errors land before the health poll starts
     if wait_health 8000 900; then
       step_ok 4 "server up with spec method '$METHOD'"
       $BENCH \

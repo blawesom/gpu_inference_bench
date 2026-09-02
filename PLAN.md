@@ -75,7 +75,13 @@ No Dockerfiles: vLLM's official pre-built images are the inference environment.
 | Intel   | `lspci \| grep -iE 'intel.*(vga|3d)'` or `/dev/dri/renderD*` | `--device=/dev/dri --group-add=video`                                             |
 
 No vendor detected → exit with hint. `--vendor` flag can force.
-Single-GPU scope: index 0 only (`CUDA_VISIBLE_DEVICES=0` / `HIP_VISIBLE_DEVICES=0` / `ONEAPI_DEVICE_SELECTOR=0`).
+Single-GPU scope: index 0 only, **except when multiple devices are present → pick the one with the largest VRAM**. Set the device index inside the container (`CUDA_VISIBLE_DEVICES=$IDX` for NVIDIA, `HIP_VISIBLE_DEVICES=$IDX` for AMD, `ONEAPI_DEVICE_SELECTOR=0` for Intel) and restrict docker GPU passthrough to that device (`--gpus 'device=$IDX'` for NVIDIA; AMD/Intel pass-through unchanged, env var selects).
+
+> **Image entrypoint gotcha (verified v0.28.0, all three official images):**
+> the images set `ENTRYPOINT ["vllm", "serve"]`. `docker run IMAGE bash -s` would
+> therefore execute `vllm serve bash -s` — and `-s` abbreviates to `-sc`
+> (`--speculative-config`), failing with `argument --speculative-config/-sc:
+> expected one argument`. Always pass `--entrypoint bash` (done in spike.sh).
 
 ### Metadata captured (→ `environment.json`)
 
@@ -352,12 +358,12 @@ set -euo pipefail
 #    weights, deleted per model), nvidia-container-toolkit (nvidia only)
 # 2. detect vendor (lspci / /dev/kfd / /dev/dri); collect environment.json
 # 3. IMAGE=<(vendor → vllm/vllm-openai[-rocm|-xpu]:v0.28.0); docker pull
-# 4. docker run --rm <device flags> --shm-size 16g
+# 4. docker run --rm --entrypoint bash (override image ENTRYPOINT ["vllm","serve"]!) <device flags> --shm-size 16g
 #      -v benchmark container/ → /bench (ro)
 #      -v config/models.yaml   → /bench/config (ro)
 #      -v $CACHE_DIR           → /hf-cache (rw)
 #      -v $RESULTS_DIR         → /results (rw)
-#      $IMAGE bash /bench/entrypoint.sh   # env: MODEL list, CONFIGS, CONCURRENCY...
+#      $IMAGE /bench/entrypoint.sh   # (--entrypoint bash is the entrypoint)
 # 5. tail report.md path; non-zero exit on any failed cell (skip ≠ failure)
 ```
 
