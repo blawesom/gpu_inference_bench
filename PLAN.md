@@ -171,9 +171,14 @@ concurrency sweep. Matrix defined in `config/models.yaml`:
 | Model | Configs tested |
 |-------|----------------|
 | M1 Qwen3.5-9B (dense)       | `baseline` · `kv-fp8` (`--kv-cache-dtype fp8`) · `long-context` (`--max-model-len 32768`, chunked prefill default on) |
-| M2 gpt-oss-20b (MoE)        | `baseline` · `kv-fp8` · `spec-mtp` (auto-skipped — vLLM 0.28.0 has no MTP support for `GptOssForCausalLM`²) |
+| M2 gpt-oss-20b (MoE)        | `baseline` · `kv-fp8` · `spec-ngram` (MTP not supported for this model in v0.28.0²) |
 | M3 Qwen3.8-27B-AWQ (dense)  | `baseline` · `kv-fp8` · `long-context` |
-| M4 Qwen3.5-35B-A3B-GPTQ (MoE) | `baseline` · `kv-fp8` · `spec-mtp` (auto-skipped — no MTP head in config³) |
+| M4 Qwen3.5-35B-A3B-GPTQ (MoE) | `baseline` · `kv-fp8` · `spec-ngram` (no MTP head in config³) |
+
+`spec-ngram` = `--speculative-config '{"method":"ngram","num_speculative_tokens":1}'`
+— the only generic speculative method verified working for these MoE models in
+v0.28.0. MTP is model-specific (`qwen3_5_mtp`, `deepseek_mtp`, …) and is not
+available for gpt-oss or the Qwen3.5-35B base, so it is not attempted.
 
 ² **Spike run 1 (2026-09-02, vLLM 0.28.0+rocm723): gpt-oss-20b has no MTP
    support.** `--speculative-config.method mtp` → `NotImplementedError:
@@ -239,12 +244,13 @@ Driven entirely by `vllm bench serve` (one invocation per cell × concurrency):
 ```
 vllm bench serve \
   --host 127.0.0.1 --port 8000 \
-  --backend vllm-chat-completions \
+  --backend openai-chat --endpoint /v1/chat/completions \
   --model <HF_MODEL> \
   --dataset-name random \
   --random-input-len 512 --random-output-len 256 \
   --num-prompts 50 \
   --max-concurrency <1|4|8|16> \
+  --num-warmups 2 \
   --seed 42 \
   --temperature 0 \
   --ignore-eos \
@@ -253,9 +259,17 @@ vllm bench serve \
   --save-result --result-filename <cell>_<C>.json
 ```
 
+> **v0.28.0 `bench serve` flag facts (verified in spike, all three official images):**
+> - Backend is **`openai-chat`** — the old `vllm-chat-completions` name is gone.
+>   The `openai-chat` backend requires the URL to end in `chat/completions`, so
+>   pass **`--endpoint /v1/chat/completions`** explicitly (the v0.28 default
+>   `--endpoint` is `/v1/completions`, which the chat backend rejects).
+> - Plain `--help` is grouped by config; use **`--help=all`** to list every flag.
+> - **`--num-warmups N`** exists (default 0) — use it for load stabilization.
+
 - Concurrency levels: **1, 4, 8, 16** (16 is the cap; more would pressure KV on 32 GB)
-- 50 prompts/level, warm-up handled by `vllm bench serve` (first requests after server start
-  are part of load stabilization; optional `--num-warmups` if available in v0.28.0 — verify in spike)
+- 50 prompts/level, **`--num-warmups 2`** for load stabilization (flag verified
+  available in v0.28.0; warmup requests are excluded from the reported metrics)
 - `--ignore-eos` + `temperature 0` → fixed 256-token outputs for stable tok/s
 - Workload shape identical across all 4 models and all vendors (comparability)
 - `--input-len/--output-len` and `--num-prompts` overridable via CLI/env
@@ -402,12 +416,11 @@ Container `entrypoint.sh` → `run_matrix.py` implements the §6 loop with:
 VRAM floor 32 GB (32–40 GB fleet) · **full matrix is the default (~4 h)** ·
 **weights deleted after each model** (`--keep-weights` to disable) ·
 power metrics **best-effort** (null when the vendor tool lacks them) ·
-per-machine standalone reports (no cross-run diff mode).
-
-**Open:** spec-mtp is dead for all four matrix models (spike run 1: no MTP
-support for gpt-oss-20b in v0.28.0; M4 has no MTP head) — replace the cell
-with `spec-ngram` (valid generic method, verified accepted in the spike) to
-keep exercising speculative-config plumbing, or drop the column.
+per-machine standalone reports (no cross-run diff mode) ·
+**MTP dropped** — not supported for any matrix model in v0.28.0 (spike); the
+two MoE models test speculative decoding via **`spec-ngram`** instead (verified
+working in the spike; MTP is model-specific and unavailable for gpt-oss / the
+Qwen3.5-35B base).
 
 **No other open items — ready to implement.**
 
@@ -418,7 +431,7 @@ keep exercising speculative-config plumbing, or drop the column.
 | # | Task | Notes |
 |---|------|-------|
 | 1 | Plan v3.1 review (this doc) | done |
-| 2 | **Spike:** on one GPU, verify `vllm bench serve` JSON schema, MTP speculative-config names/flags for gpt-oss-20b + Qwen3-30B-A3B, `--kv-cache-dtype fp8` support, `--num-warmups` availability in v0.28.0 | Determines exact flags in models.yaml |
+| 2 | **Spike:** verify `vllm bench serve` JSON schema, speculative-config flags, `--kv-cache-dtype fp8` support, `--num-warmups` availability in v0.28.0 | **done** — `spike.sh`; JSON schema captured, fp8 KV OK, ngram OK, MTP unsupported for gpt-oss, backend=`openai-chat`+`--endpoint` |
 | 3 | `config/models.yaml` + `run_matrix.py` (server lifecycle, sweep, auto-skip) | |
 | 4 | `telemetry.py` (nvidia-smi / rocm-smi / intel_gpu_top samplers) | |
 | 5 | `report.py` (JSON + Markdown) | |
@@ -433,3 +446,5 @@ keep exercising speculative-config plumbing, or drop the column.
 *Draft v3.1 — 2026-09-02 (final: cyankiwi 27B, Qwen 35B cross-vendor, 32–40 GB fleet, full-matrix default, per-model weight deletion, best-effort power metrics, per-machine standalone reports; latest-gen models; measured on-disk sizes; MTP pre-check; NVFP4 cross-vendor exclusion)*
 *
 *v3.2 — 2026-09-02 (spike run 1 on ROCm 7.2.3 target: MTP not supported for gpt-oss-20b in vLLM 0.28.0 → M2 spec-mtp now auto-skipped; open item: spec-mtp column vs spec-ngram; bench JSON schema + fp8-KV support pending spike run 2)*
+*
+*v3.3 — 2026-09-02 (spike complete on ROCm 7.2.3 target: bench backend is `openai-chat`+`--endpoint /v1/chat/completions`, `--help=all`, `--num-warmups` available, fp8 KV + ngram verified working. MTP dropped from all matrix models; the two MoE models use `spec-ngram`. §7 bench command corrected.)*
