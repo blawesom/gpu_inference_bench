@@ -53,11 +53,68 @@ HEALTH_PATH = "/health"
 DEFAULT_START_TIMEOUT = int(os.environ.get("SERVER_START_TIMEOUT", "900"))
 
 
+def _run_cmd(cmd: list[str], env: dict | None = None, timeout: float = 20.0) -> str | None:
+    """Run a command, return stdout or None on any failure."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                           env=env)
+        if r.returncode == 0:
+            return r.stdout
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
+    """Select a GPU inside the container and set the visibility env var.
+
+    Returns the index to pass to the telemetry sampler:
+      * AMD: the physical index (vllm sees it as its device 0 after
+        HIP_VISIBLE_DEVICES; the sampler reads the *unfiltered* rocm-smi
+        table, so it needs the physical index to pick the right row).
+      * NVIDIA: 0 (bench.sh passes --gpus device=N, so only one GPU is
+        visible in the container and it is device 0).
+      * Intel: 0.
+    """
+    vendor = (vendor or "auto").lower()
+    if vendor == "amd":
+        env = {k: v for k, v in os.environ.items() if k != "HIP_VISIBLE_DEVICES"}
+        out = _run_cmd(["rocm-smi", "--showmeminfo", "vram"], env=env, timeout=30.0)
+        totals: dict[int, int] = {}
+        for m in re.finditer(r"GPU\[(\d+)\].*?VRAM Total Memory \(B\): (\d+)",
+                             out or ""):
+            totals[int(m.group(1))] = int(m.group(2))
+        if not totals:
+            raise SystemExit("ERROR: no AMD GPU visible via rocm-smi")
+        idx = forced_idx if forced_idx is not None else max(
+            totals, key=lambda k: totals[k])
+        if idx not in totals:
+            raise SystemExit(f"ERROR: AMD GPU index {idx} not present "
+                             f"(available: {sorted(totals)})")
+        os.environ["HIP_VISIBLE_DEVICES"] = str(idx)
+        print(f"[gpu-select] AMD physical idx {idx} "
+              f"({totals[idx] // (1024 ** 3)} GB) → HIP_VISIBLE_DEVICES={idx}")
+        return idx
+    if vendor == "nvidia":
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        print("[gpu-select] NVIDIA: in-container device 0 "
+              "(single GPU via --gpus device=N)")
+        return 0
+    if vendor == "intel":
+        os.environ.setdefault("ONEAPI_DEVICE_SELECTOR", "level_zero/0")
+        print("[gpu-select] Intel: level_zero/0")
+        return 0
+    raise SystemExit(f"ERROR: unsupported GPU_VENDOR {vendor!r} "
+                     f"(expect amd|nvidia|intel)")
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="GPU inference benchmark orchestrator")
     p.add_argument("--config", default="/bench/config/models.yaml")
     p.add_argument("--results", default="/results")
     p.add_argument("--vendor", default=os.environ.get("GPU_VENDOR", "auto"))
+    p.add_argument("--gpu-index", type=int, default=None,
+                   help="physical GPU index (overrides auto-pick by VRAM)")
     p.add_argument("--models", default=None, help="comma list, e.g. M1,M2")
     p.add_argument("--configs", default=None, help="comma list, e.g. baseline,kv-fp8")
     p.add_argument("--concurrency", default=None, help="comma list, e.g. 1,8,16")
@@ -219,7 +276,7 @@ def delete_weights(model_id: str) -> bool:
 
 # ── Orchestration ────────────────────────────────────────────────────────────
 def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dict,
-             results: Path, vendor: str, concurrencies: list[int],
+             results: Path, vendor: str, gpu_index: int | None, concurrencies: list[int],
              start_timeout: int, dry_run: bool) -> dict:
     tag = f"{model_key}_{cfg['name']}"
     server_log = results / f"server_{tag}.log"
@@ -258,7 +315,7 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
         cell["status"], cell["reason"] = "failed", f"orchestration:{e}"
         return cell
 
-    sampler = TelemetrySampler(vendor) if TelemetrySampler else None
+    sampler = (TelemetrySampler(vendor, gpu_index) if TelemetrySampler else None)
     try:
         for c in concurrencies:
             bench_out = results / f"bench_{tag}_{c}.json"
@@ -292,8 +349,9 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
 
 
 def run_model(model_key: str, model: dict, cfgs: list[dict], workload: dict,
-              common: dict, results: Path, vendor: str, concurrencies: list[int],
-              start_timeout: int, keep_weights: bool, dry_run: bool) -> list[dict]:
+              common: dict, results: Path, vendor: str, gpu_index: int | None,
+              concurrencies: list[int], start_timeout: int,
+              keep_weights: bool, dry_run: bool) -> list[dict]:
     cells = []
     if not dry_run:
         print(f"[model {model_key}] downloading {model['id']} ...")
@@ -309,7 +367,7 @@ def run_model(model_key: str, model: dict, cfgs: list[dict], workload: dict,
             return cells
     for cfg in cfgs:
         cells.append(run_cell(model_key, model, cfg, workload, common, results,
-                              vendor, concurrencies, start_timeout, dry_run))
+                              vendor, gpu_index, concurrencies, start_timeout, dry_run))
     if not dry_run and not keep_weights:
         removed = delete_weights(model["id"])
         for c in cells:
@@ -341,6 +399,10 @@ def main() -> int:
     results = Path(args.results)
     results.mkdir(parents=True, exist_ok=True)
 
+    gpu_index: int | None = None
+    if not args.dry_run:
+        gpu_index = select_gpu(args.vendor, args.gpu_index)
+
     all_cells: list[dict] = []
     for mk in model_keys:
         if mk not in models:
@@ -350,8 +412,9 @@ def main() -> int:
         sel = names or model.get("configs", list(configs_by_name.keys()))
         cfgs = [configs_by_name[n] for n in sel if n in configs_by_name]
         all_cells.extend(run_model(mk, model, cfgs, workload, common, results,
-                                   args.vendor, concurrencies, args.start_timeout,
-                                   args.keep_weights, args.dry_run))
+                                   args.vendor, gpu_index, concurrencies,
+                                   args.start_timeout, args.keep_weights,
+                                   args.dry_run))
 
     (results / "cells.json").write_text(json.dumps(all_cells, indent=2))
     n_ok = sum(1 for c in all_cells if c["status"] == "ok")
