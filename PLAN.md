@@ -317,61 +317,77 @@ failing.
 
 ```json
 {
-  "schema_version": "2.0",
+  "schema_version": "1.0",
   "run_id": "20260902-120000_nvidia-geforce-rtx-4090",
+  "generated_at": "2026-09-02T16:05:12+00:00",
   "environment": {
     "vendor": "nvidia",
     "gpu": "NVIDIA GeForce RTX 4090",
-    "vram_total_gb": 24,
+    "gpu_index_in_container": 0,
+    "vram_total_gb": 24.0,
     "driver": "570.124.06",
     "stack": {"cuda": "12.9", "rocm": null, "xpu": null},
     "os": "Ubuntu 24.04", "kernel": "6.8.0-xx",
-    "image": "vllm/vllm-openai:v0.28.0",
-    "image_digest": "sha256:...",
-    "vllm_version": "0.28.0"
+    "cpu": "AMD EPYC ...", "cpu_cores": 128, "ram_gb": 512.0,
+    "gpu_kernel_modules": ["nvidia", "nvidia_drm", "nvidia_modeset", "nvidia_uvm"],
+    "docker_version": "27.3.1", "image": "vllm/vllm-openai:v0.28.0",
+    "image_id": "sha256:...", "vllm_version": "0.28.0"
   },
-  "workload": {"input_tokens": 512, "output_tokens": 256,
-               "concurrency_levels": [1,4,8,16], "num_prompts": 50, "seed": 42},
+  "workload": {"random_input_len": 512, "random_output_len": 256, "num_prompts": 50,
+               "num_warmups": 2, "concurrency_levels": [1,4,8,16], "seed": 42, "...": "..."},
   "models": {
-    "M1": {"id": "Qwen/Qwen3.5-9B",  "class": "dense-9b",  "format": "bf16",   "weights_gb": 19.3},
-    "M2": {"id": "openai/gpt-oss-20b", "class": "moe-small", "format": "mxfp4",  "weights_gb": 13.8},
-    "M3": {"id": "cyankiwi/Qwen3.8-27B-AWQ-INT4", "class": "dense-27b", "format": "awq4", "weights_gb": 21.0},
-    "M4": {"id": "Qwen/Qwen3.5-35B-A3B-GPTQ-Int4", "class": "moe-35b-a3b", "format": "gptq4", "weights_gb": 24.4}
+    "M1": {"id": "Qwen/Qwen3.5-9B", "class": "dense-9b", "format": "bf16",
+           "weights_gb": 19.3, "max_model_len": 8192,
+           "configs": ["baseline", "kv-fp8", "long-context"]},
+    "M2": {"id": "openai/gpt-oss-20b", "...": "..."},
+    "M3": {"id": "cyankiwi/Qwen3.8-27B-AWQ-INT4", "...": "..."},
+    "M4": {"id": "Qwen/Qwen3.5-35B-A3B-GPTQ-Int4", "...": "..."}
   },
-  "results": [
+  "metadata": {"gpu": "NVIDIA GeForce RTX 4090", "total_cells": 13, "total_rows": 52,
+               "bench_rows": 50, "skip_rows": 2, "fail_rows": 0, "vllm_version": "0.28.0"},
+  "rows": [
     {
-      "model": "M1", "config": "baseline",
-      "server_flags": {"max_model_len": 8192},
-      "status": "ok",
-      "concurrency": 8,
-      "metrics": {
-        "ttft_ms": {"p50": 41.2, "p90": 95.0, "p99": 180.4},
-        "tpot_ms": {"p50": 9.1,  "p90": 12.3, "p99": 21.0},
-        "itl_ms":  {"p50": 9.0,  "p90": 12.0, "p99": 19.5},
-        "request_throughput_rps": 0.88,
-        "output_token_throughput_tps": 225.1,
-        "wall_time_s": 56.9
-      },
-      "gpu": {"mem_peak_gb": 26.1, "util_avg_pct": 96.0, "power_avg_w": 335.0,
-               "weights_removed": true}
+      "model": "Qwen/Qwen3.5-9B", "config": "baseline", "concurrency": 8,
+      "status": "ok", "reason": null,
+      "completed": 50, "failed": 0,
+      "request_throughput": 0.88, "output_throughput": 225.1,
+      "ttft_p50_ms": 41.2, "ttft_p90_ms": 95.0, "ttft_p99_ms": 180.4,
+      "tpot_p50_ms": 9.1,  "tpot_p90_ms": 12.3, "tpot_p99_ms": 21.0,
+      "itl_p50_ms": 9.0,   "itl_p90_ms": 12.0,  "itl_p99_ms": 19.5,
+      "duration_s": 56.9,
+      "telemetry": {"mem_peak_gb": 26.1, "util_avg_pct": 96.0, "power_avg_w": 335.0, "...": "..."}
     }
   ]
 }
 ```
 
-`report.md` renders one table per model: rows = configs (with skip reasons),
-columns grouped by concurrency:
+`rows` is one entry per (cell × concurrency) — flat, with the raw v0.28 bench
+keys mapped through `report.py: BENCH_KEY_MAP`; cell-level skips/failures
+repeat the status/reason across the cell's concurrency levels with null
+metrics. `environment` is `null` if collection failed (never fatal).
+
+`report.md` renders: header (GPU, run-id, vLLM version), metric counts,
+**Environment** table, C=1 model summary, then one table per model — rows =
+config × concurrency, columns = status + latency/throughput + GPU telemetry:
 
 ```markdown
-### M4 · Qwen3-30B-A3B (AWQ-4bit, 17 GB)
+# GPU Inference Bench Report
 
-| config    | C  | TTFT p50 | TTFT p99 | TPOT p50 | req/s | tok/s | GPU mem | util |
-|-----------|----|----------|----------|----------|-------|-------|---------|------|
-| baseline  |  1 |  38 ms   |  71 ms   |  6.9 ms  | 0.15  | 37    | 19.2 GB |  88% |
-|           | 16 | ...      | ...      | ...      | ...   | ...   | ...     | ...  |
-| kv-fp8    | 16 | ...      | ...      | ...      | ...   | ...   | ...     | ...  |
-| mtp       | 16 | ...      | ...      | ...      | ...   | ...   | ...     | ...  |
-| mtp       | —  | SKIPPED: qwen3_mtp not supported on this backend |
+**NVIDIA GeForce RTX 4090** · Run: 20260902-160512_nvidia-geforce-rtx-4090 · vLLM 0.28.0 · ...
+
+## Environment
+| Field | Value |
+|-------|-------|
+| GPU   | NVIDIA GeForce RTX 4090 |
+| Image | vllm/vllm-openai:v0.28.0 |
+| Image ID | sha256:... |
+
+## M4 · Qwen/Qwen3.5-35B-A3B-GPTQ-Int4
+
+| Config | C | Status | Req/s | Tok/s | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Mem peak GB | Util % | Power W |
+|--------|---|--------|-------|-------|----------|----------|----------|----------|---------|---------|-------|-------------|--------|---------|
+| baseline | 1 | ok | 0.15 | 37 | 38 ms | 71 ms | ... |
+| kv-fp8   | 1 | skipped: kv-fp8-unsupported | n/a | n/a | ... |
 ```
 
 ---
@@ -383,29 +399,35 @@ columns grouped by concurrency:
 set -euo pipefail
 
 # Flags:
-#   --models M1,M2,M3,M4 | --configs baseline,kv-fp8,mtp | --concurrency 1,4,8,16
-#   --image <override>   --vendor <nvidia|amd|intel>      --quick
+#   --models M1,M2,M3,M4 | --configs baseline,kv-fp8,long-context | --concurrency 1,4,8,16
+#   --image <override>   --vendor <nvidia|amd|intel>              --quick
 #   --keep-weights (debug; default: delete after each model)
-#   --cache-dir ~/.gpu-bench/hf-cache  --results-dir ./results
-#   --keep-server (debug) --dry-run
+#   --cache-dir <dir>    --results <dir>  --gpu-index N  --start-timeout S
+#   --version <tag>      --dry-run        --force
 
-# 1. preflight: docker daemon, vendor detected, disk ≥ 50 GB free (sequential
-#    weights, deleted per model), nvidia-container-toolkit (nvidia only)
-# 2. detect vendor (lspci / /dev/kfd / /dev/dri); collect environment.json
-# 3. IMAGE=<(vendor → vllm/vllm-openai[-rocm|-xpu]:v0.28.0); docker pull
-# 4. docker run --rm --entrypoint bash (override image ENTRYPOINT ["vllm","serve"]!) <device flags> --shm-size 16g
-#      -v benchmark container/ → /bench (ro)
-#      -v config/models.yaml   → /bench/config (ro)
-#      -v $CACHE_DIR           → /hf-cache (rw)
-#      -v $RESULTS_DIR         → /results (rw)
-#      $IMAGE /bench/entrypoint.sh   # (--entrypoint bash is the entrypoint)
-# 5. tail report.md path; non-zero exit on any failed cell (skip ≠ failure)
+# 1. preflight: docker daemon, vendor detected, disk gates (shared-FS aware),
+#    stale container/image cleanup
+# 2. host metadata (host OS, docker version, image id) → env for container
+# 3. IMAGE=<(vendor → vllm/vllm-openai[-rocm|-xpu]:$VLLM_VERSION, or --image);
+#    docker pull + post-pull disk gate
+# 4. docker run --rm --entrypoint bash (override image ENTRYPOINT ["vllm","serve"]!)
+#    <vendor device flags> -e RUN_ID=<host timestamp>
+#      -v $REPO_DIR   → /bench (ro: container/ + config/models.yaml)
+#      -v $HF_CACHE   → /hf-cache (rw)
+#      -v $RESULTS   → /results (rw)
+#      $IMAGE /bench/container/entrypoint.sh
+# 5. tail report.md of the run dir (via results/.latest);
+#    non-zero exit on any failed cell (skip ≠ failure)
 ```
 
 Container `entrypoint.sh` → `run_matrix.py` implements the §6 loop with:
-- health wait (≤ 300 s), startup-log parse for skip reasons,
-- GPU telemetry thread (vendor-specific sampler),
+- in-container GPU selection (max-VRAM or `--gpu-index`) + GPU name capture,
+- `environment.json` collection (best-effort, never fatal),
+- per-run output dir `<results>/<RUN_ID>_<gpu-slug>/` + `.latest` pointer,
+- health wait (default 900 s, `--start-timeout`), startup-log parse for skip reasons,
+- GPU telemetry thread (vendor-specific 1 Hz sampler),
 - `subprocess` calls to `vllm serve` / `vllm bench serve`,
+- weight deletion after each model (unless `--keep-weights`),
 - `report.py` aggregation at the end (even on partial failure).
 
 ---
@@ -450,10 +472,10 @@ workload).
 | 4 | `telemetry.py` (nvidia-smi / rocm-smi / intel_gpu_top samplers) | **done** — 1 Hz sampler; AMD reads unfiltered `rocm-smi` by physical idx; NVIDIA `nvidia-smi -i`; Intel `xpu-smi` best-effort; `start/stop/aggregate` API |
 | 5 | `report.py` (JSON + Markdown) | **done** — maps real v0.28 bench keys (`p50_ttft_ms`…) → normalized schema; per-(cell,C) rows; `report.json` + `report.md` |
 | 6 | `bench.sh` (detection, pull, run, exit codes) | **done** — vendor detect, per-vendor image + GPU args, disk gates, stale cleanup, `docker run --entrypoint bash` → `entrypoint.sh`, `--dry-run` |
-| 7 | Smoke test: `--quick` on NVIDIA (this env or user's box) | |
-| 8 | Full matrix run, NVIDIA | |
-| 9 | Port checks: AMD, Intel (XPU FP8-KV/MTP auto-skip paths exercised) | |
-| 10 | README + usage examples | |
+| 7 | Smoke test: `--quick` on NVIDIA (this env or user's box) | pending — needs a live GPU box (this repo was built on a GPU-less host) |
+| 8 | Full matrix run, NVIDIA | pending — needs a live GPU box |
+| 9 | Port checks: AMD, Intel (XPU FP8-KV/MTP auto-skip paths exercised) | pending — needs live AMD/Intel boxes |
+| 10 | README + usage examples | **done** — requirements, full flag reference, output layout, metrics/workload, storage behavior, troubleshooting, known limitations |
 
 ---
 
@@ -466,3 +488,5 @@ workload).
 *v3.4 — 2026-09-02 (MoE models M2/M4 run `baseline · kv-fp8` only — no speculative decoding; real bench result JSON schema captured from spike, recorded as the report.py field source.)*
 *
 *v3.5 — 2026-09-02 (milestones 3–6 built & mock-tested end-to-end: `config/models.yaml`, `container/run_matrix.py` (in-container GPU select, server lifecycle, C-sweep, weight delete, `cells.json`), `container/telemetry.py` (1 Hz AMD/NVIDIA/Intel), `container/report.py` (real-key mapping, JSON+MD), `container/entrypoint.sh`, `bench.sh` (vendor detect, image+GPU args, disk gates, stale cleanup, `--dry-run`). Full 4-model mock matrix: 10 cells → 20 rows, clean. Next: milestone 7 (real `--quick` smoke on a live GPU).)*
+*
+*v3.6 — 2026-09-02 (implementation finished for the GPU-less build host: per-run output dirs `results/<ts>_<gpu-slug>/` + `.latest`; `environment.json` (GPU/driver/stack/OS/kernel/CPU/RAM/docker/image-id/vLLM) written in-container, best-effort; `cells.json` is now a self-contained manifest (workload/models/cells); `report.json` schema v1.0 (run_id, environment, workload, models, metadata, flat rows); `report.md` env block + per-model tables; `bench.sh` gains `--image`/`--cache-dir`, passes host OS/docker-version/image-id to the container. Milestone 10 done (README). Milestones 7–9 remain: they require live GPU hardware.)*
