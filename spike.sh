@@ -178,6 +178,8 @@ docker run -i --rm \
   -e EXPECTED_VRAM_MB="$GPU_VRAM_MB" \
   -e EXPECTED_GPU_IDX="$GPU_IDX" \
   -e MIN_VRAM_MB="$MIN_VRAM_MB" \
+  -e HOST_UID="$(id -u)" \
+  -e HOST_GID="$(id -g)" \
   -e SKIP_GPT_OSS="$SKIP_GPT_OSS" \
   -e GPU_VENDOR="$VENDOR" \
   "$IMAGE" -s <<'EOSPIKE'
@@ -409,8 +411,7 @@ else
 fi
 
 # ── S5: telemetry tools ───────────────────────────────────────────────────────
-step_begin 5 "telemetry tools"
-if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi > s5-nvidia.log 2>&1; then
+step_begin 5 "telemetry tools"if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi > s5-nvidia.log 2>&1; then
   step_ok 5 "nvidia-smi"
   grep -qiE "power" s5-nvidia.log && step_ok 5 "power field" || step_fail 5 "power field" "n/a in output"
 elif command -v rocm-smi >/dev/null 2>&1 && rocm-smi > s5-rocm.log 2>&1; then
@@ -421,6 +422,12 @@ elif command -v intel_gpu_top >/dev/null 2>&1 && timeout 10 intel_gpu_top --json
   grep -qiE "power" s5-intel.log && step_ok 5 "power field" || step_fail 5 "power field" "n/a in output (expected)"
 else
   step_fail 5 "telemetry tool" "none of nvidia-smi/rocm-smi/intel_gpu_top usable in container"
+fi
+
+# return the mounted deliverables to the host user (container runs as root)
+if [[ "${HOST_UID:-0}" != "0" ]]; then
+  chown -R "${HOST_UID}:${HOST_GID:-0}" "$OUT" 2>/dev/null || true
+  chown -R "${HOST_UID}:${HOST_GID:-0}" /hf-cache 2>/dev/null || true
 fi
 
 echo "==== spike complete ====" | tee -a summary.txt
