@@ -309,7 +309,7 @@ if wait_health 8000 600; then
   step_ok 2 "server up (Qwen3.5-4B)" "health OK on :8000"
   $BENCH \
     --host 127.0.0.1 --port 8000 \
-    --backend vllm-chat-completions \
+    --backend openai-chat \
     --model Qwen/Qwen3.5-4B \
     --dataset-name random \
     --random-input-len 512 --random-output-len 256 \
@@ -343,7 +343,7 @@ SRV_PID=$!
 if wait_health 8000 300; then
   step_ok 3 "server up with fp8 KV" "health OK on :8000"
   $BENCH \
-    --host 127.0.0.1 --port 8000 --backend vllm-chat-completions \
+    --host 127.0.0.1 --port 8000 --backend openai-chat \
     --model Qwen/Qwen3.5-4B --dataset-name random \
     --random-input-len 512 --random-output-len 256 \
     --num-prompts 5 --max-concurrency 1 \
@@ -377,7 +377,7 @@ else
     if wait_health 8000 900; then
       step_ok 4 "server up with spec method '$METHOD'" "health OK on :8000"
       $BENCH \
-        --host 127.0.0.1 --port 8000 --backend vllm-chat-completions \
+        --host 127.0.0.1 --port 8000 --backend openai-chat \
         --model openai/gpt-oss-20b --dataset-name random \
         --random-input-len 512 --random-output-len 256 \
         --num-prompts 5 --max-concurrency 1 \
