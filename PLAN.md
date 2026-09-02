@@ -171,31 +171,18 @@ concurrency sweep. Matrix defined in `config/models.yaml`:
 | Model | Configs tested |
 |-------|----------------|
 | M1 Qwen3.5-9B (dense)       | `baseline` · `kv-fp8` (`--kv-cache-dtype fp8`) · `long-context` (`--max-model-len 32768`, chunked prefill default on) |
-| M2 gpt-oss-20b (MoE)        | `baseline` · `kv-fp8` · `spec-ngram` (MTP not supported for this model in v0.28.0²) |
+| M2 gpt-oss-20b (MoE)        | `baseline` · `kv-fp8` |
 | M3 Qwen3.8-27B-AWQ (dense)  | `baseline` · `kv-fp8` · `long-context` |
-| M4 Qwen3.5-35B-A3B-GPTQ (MoE) | `baseline` · `kv-fp8` · `spec-ngram` (no MTP head in config³) |
+| M4 Qwen3.5-35B-A3B-GPTQ (MoE) | `baseline` · `kv-fp8` |
 
-`spec-ngram` = `--speculative-config '{"method":"ngram","num_speculative_tokens":1}'`
-— the only generic speculative method verified working for these MoE models in
-v0.28.0. MTP is model-specific (`qwen3_5_mtp`, `deepseek_mtp`, …) and is not
-available for gpt-oss or the Qwen3.5-35B base, so it is not attempted.
-
-² **Spike run 1 (2026-09-02, vLLM 0.28.0+rocm723): gpt-oss-20b has no MTP
-   support.** `--speculative-config.method mtp` → `NotImplementedError:
-   Unsupported speculative method: 'mtp'` at argument validation (vLLM has
-   no MTP handler for `GptOssForCausalLM`); `gpt_oss_mtp` is not a valid
-   method literal. MTP method names in v0.28.0 are model-specific
-   (`qwen3_5_mtp`, `qwen3_next_mtp`, `deepseek_mtp`, …). The orchestrator
-   pre-check (³) catches this without launching a server (gpt-oss
-   config.json has no `num_nextn_predict_layers`). `ngram` is a valid
-   generic speculative method (accepted, server started in the spike;
-   its S4 bench was blocked only by host disk space).
-
-³ Pre-check: the orchestrator reads the HF `config.json` of each model before
-   starting a server; `num_nextn_predict_layers` absent ⇒ `spec-mtp` marked
-   `skipped:no-mtp-head` **without launching the server** (no wasted minutes).
-   Qwen3.5-35B-A3B base has no nextn layers; if an Instruct variant with MTP
-   appears, the config file picks it up automatically.
+Speculative decoding is **not tested.** MTP is model-specific (`qwen3_5_mtp`,
+`deepseek_mtp`, …) and unsupported for every matrix model in v0.28.0 — gpt-oss
+`GptOssForCausalLM` has no MTP handler (`--speculative-config.method mtp` →
+`NotImplementedError` at arg validation, verified in spike) and the Qwen3.5-35B
+base has no MTP head (`num_nextn_predict_layers` absent from config.json). The
+only generic method, `ngram`, was verified working in the spike but is not a
+meaningful perf axis on the random workload, so the MoE models run
+`baseline · kv-fp8` only.
 
 - **Auto-skip semantics:** if the vendor backend rejects a config (e.g. FP8 KV
   cache not supported on XPU/ROCm in v0.28.0, MTP kernel unavailable), the server
@@ -274,9 +261,26 @@ vllm bench serve \
 - Workload shape identical across all 4 models and all vendors (comparability)
 - `--input-len/--output-len` and `--num-prompts` overridable via CLI/env
 
-**Metrics per cell × concurrency** (from `vllm bench serve` JSON):
-TTFT p50/p90/p99, TPOT p50/p90/p99, ITL p50/p90/p99, request throughput (req/s),
-output token throughput (tok/s), total wall time, successful/failed count.
+**Metrics per cell × concurrency** (from `vllm bench serve` JSON — actual v0.28.0 keys, captured in spike):
+
+| Metric | JSON key(s) |
+|--------|-------------|
+| TTFT ms | `p50_ttft_ms`, `p90_ttft_ms`, `p99_ttft_ms` (also `mean/median/std_ttft_ms`) |
+| TPOT ms | `p50_tpot_ms`, `p90_tpot_ms`, `p99_tpot_ms` (also `mean/median/std_tpot_ms`) |
+| ITL ms  | `p50_itl_ms`, `p90_itl_ms`, `p99_itl_ms` (also `mean/median/std_itl_ms`) |
+| Request throughput (req/s) | `request_throughput` |
+| Output token throughput (tok/s) | `output_throughput` |
+| Total token throughput (tok/s) | `total_token_throughput` |
+| Peak output tok/s | `max_output_tokens_per_s` |
+| Real-time factor | `rtfx` |
+| Wall time (s) | `duration` |
+| Completed / failed / total | `completed`, `failed`, `num_prompts` |
+| Request rate | `request_rate` |
+| Goodput | `request_goodput` |
+| Token totals | `total_input_tokens`, `total_output_tokens` |
+
+`report.py` maps these flat keys into the normalized `metrics{}` object in the
+§8 schema (e.g. `p50_ttft_ms` → `metrics.ttft_ms.p50`).
 
 **Plus our telemetry** (1 Hz sampler in the container, per-vendor):
 GPU memory used (peak), GPU utilization (% avg), and **best-effort power draw**
@@ -418,9 +422,9 @@ VRAM floor 32 GB (32–40 GB fleet) · **full matrix is the default (~4 h)** ·
 power metrics **best-effort** (null when the vendor tool lacks them) ·
 per-machine standalone reports (no cross-run diff mode) ·
 **MTP dropped** — not supported for any matrix model in v0.28.0 (spike); the
-two MoE models test speculative decoding via **`spec-ngram`** instead (verified
-working in the spike; MTP is model-specific and unavailable for gpt-oss / the
-Qwen3.5-35B base).
+two MoE models run **`baseline · kv-fp8` only** (no speculative decoding — `ngram`
+was benchmarked in the spike but is not a meaningful perf axis on the random
+workload).
 
 **No other open items — ready to implement.**
 
@@ -447,4 +451,6 @@ Qwen3.5-35B base).
 *
 *v3.2 — 2026-09-02 (spike run 1 on ROCm 7.2.3 target: MTP not supported for gpt-oss-20b in vLLM 0.28.0 → M2 spec-mtp now auto-skipped; open item: spec-mtp column vs spec-ngram; bench JSON schema + fp8-KV support pending spike run 2)*
 *
-*v3.3 — 2026-09-02 (spike complete on ROCm 7.2.3 target: bench backend is `openai-chat`+`--endpoint /v1/chat/completions`, `--help=all`, `--num-warmups` available, fp8 KV + ngram verified working. MTP dropped from all matrix models; the two MoE models use `spec-ngram`. §7 bench command corrected.)*
+*v3.3 — 2026-09-02 (spike complete on ROCm 7.2.3 target: bench backend is `openai-chat`+`--endpoint /v1/chat/completions`, `--help=all`, `--num-warmups` available, fp8 KV + ngram verified working. MTP dropped from all matrix models. §7 bench command corrected.)*
+*
+*v3.4 — 2026-09-02 (MoE models M2/M4 run `baseline · kv-fp8` only — no speculative decoding; real bench result JSON schema captured from spike, recorded as the report.py field source.)*
