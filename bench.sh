@@ -12,6 +12,7 @@
 #   ./bench.sh --keep-weights           # don't delete weights between models
 #   ./bench.sh --vendor amd             # override vendor detection
 #   ./bench.sh --dry-run                # print the docker command, don't run
+#   ./bench.sh --force                  # skip the disk-space gate
 #
 # Outputs land in ./results (report.json + report.md + raw bench/telemetry JSON).
 set -uo pipefail
@@ -22,11 +23,18 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_DIR="${RESULTS_DIR:-$REPO_DIR/results}"
 HF_CACHE_HOST="${HF_CACHE_HOST:-$HOME/.cache/gpu-bench/hf}"
 CONTAINER_NAME="gpu-bench"
-# Disk gates (GB). HF cache holds one model at a time (weights deleted per
-# model), so 30 GB is plenty; the vllm image is ~25 GB so docker root needs
-# headroom.
-MIN_HF_GB=30
-MIN_DOCKER_GB=45
+# Disk gates (GB).
+#   NEED_MODEL_GB        — HF cache: one model at a time (largest ~24.4 GB,
+#                          plus LFS blob→file reconstruction headroom).
+#   NEED_DOCKER_GB       — docker root when a fresh image pull is needed
+#                          (~25 GB image + container headroom).
+#   NEED_DOCKER_PRESENT_GB — docker root headroom when the image is already
+#                          present locally.
+# When the HF cache and docker root share a filesystem, the requirements are
+# summed (the image pull and the weight download compete for the same disk).
+NEED_MODEL_GB=30
+NEED_DOCKER_GB=35
+NEED_DOCKER_PRESENT_GB=15
 
 usage() {
     grep '^#   \./bench.sh' "$0" | sed 's/^#   //'
@@ -43,6 +51,7 @@ QUICK=0
 KEEP_WEIGHTS=0
 START_TIMEOUT="${SERVER_START_TIMEOUT:-900}"
 DRY_RUN=0
+FORCE=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --vendor)        VENDOR="${2:-}"; shift 2 ;;
@@ -63,6 +72,7 @@ while [[ $# -gt 0 ]]; do
         --results=*)     RESULTS_DIR="${1#*=}"; shift ;;
         --version)       VLLM_VERSION="${2:-$VLLM_VERSION}"; shift 2 ;;
         --dry-run)       DRY_RUN=1; shift ;;
+        --force)         FORCE=1; shift ;;
         -h|--help)       usage ;;
         *) echo "Unknown arg: $1 (see --help)" >&2; exit 2 ;;
     esac
@@ -98,21 +108,63 @@ select_nvidia_gpu() {
         | sort -k2 -nr | head -1 | awk '{print $1}'
 }
 
-check_disk() {
-    local path="$1" need_gb="$2" label="$3"
-    [[ -e "$path" ]] || mkdir -p "$path" 2>/dev/null || true
-    local avail_kb
-    avail_kb=$(df -Pk "$path" 2>/dev/null | awk 'NR==2{print $4}')
-    if [[ -z "$avail_kb" ]]; then
-        log "WARN: cannot stat disk for $label ($path)"
-        return
-    fi
-    local avail_gb=$(( avail_kb / 1024 / 1024 ))
-    if (( avail_gb < need_gb )); then
-        log "WARN: $label has ${avail_gb}GB free (< ${need_gb}GB) at $path"
+# ── disk helpers ─────────────────────────────────────────────────────────────
+# Filesystem id (device number) of the FS backing a path — used to detect
+# whether two paths share the same disk.
+fsid() { stat -c %d "$1" 2>/dev/null || echo ""; }
+# Free space (GB) on the FS backing a path.
+free_gb() { df -Pk "$1" 2>/dev/null | awk 'NR==2{print int($4/1024/1024)}'; }
+
+# Hard pre-flight gate (unless --force). Ensures enough free space to (a) pull
+# the image if not already present, and (b) download the largest model. If the
+# HF cache and docker root share a filesystem their requirements are summed.
+disk_gate() {
+    mkdir -p "$HF_CACHE_HOST" "$RESULTS_DIR" 2>/dev/null || true
+    local docker_root
+    docker_root=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)
+    [[ -n "$docker_root" ]] || docker_root="/var/lib/docker"
+
+    local hf_id docker_id
+    hf_id=$(fsid "$HF_CACHE_HOST")
+    docker_id=$(fsid "$docker_root")
+
+    local image_present=0
+    docker image inspect "$IMAGE" >/dev/null 2>&1 && image_present=1
+
+    local image_need=$NEED_DOCKER_PRESENT_GB
+    (( image_present == 0 )) && image_need=$NEED_DOCKER_GB
+
+    local avail
+    if [[ -n "$hf_id" && "$hf_id" == "$docker_id" ]]; then
+        # Same filesystem: image + model coexist here.
+        local total=$(( NEED_MODEL_GB + image_need ))
+        avail=$(free_gb "$HF_CACHE_HOST")
+        log "disk: HF cache + docker share one FS — need ${total}GB (model ${NEED_MODEL_GB} + docker ${image_need}), have ${avail:-0}GB at $HF_CACHE_HOST"
+        if [[ "$FORCE" -eq 0 ]] && { [[ -z "$avail" ]] || (( avail < total )); }; then
+            die "not enough disk on shared FS ($HF_CACHE_HOST): need ${total}GB, have ${avail:-0}GB. Free space, set HF_CACHE_HOST to a larger disk, or pass --force."
+        fi
     else
-        log "disk: $label ${avail_gb}GB free at $path (need ${need_gb}GB)"
+        avail=$(free_gb "$HF_CACHE_HOST")
+        log "disk: HF cache ${avail:-0}GB free at $HF_CACHE_HOST (need ${NEED_MODEL_GB}GB)"
+        if [[ "$FORCE" -eq 0 ]] && { [[ -z "$avail" ]] || (( avail < NEED_MODEL_GB )); }; then
+            die "not enough disk for HF cache ($HF_CACHE_HOST): need ${NEED_MODEL_GB}GB, have ${avail:-0}GB. Free space, set HF_CACHE_HOST to a larger disk, or pass --force."
+        fi
+        local dk; dk=$(free_gb "$docker_root")
+        log "disk: docker root ${dk:-0}GB free at $docker_root (need ${image_need}GB)"
+        if [[ "$FORCE" -eq 0 ]] && { [[ -z "$dk" ]] || (( dk < image_need )); }; then
+            die "not enough disk for docker root ($docker_root): need ${image_need}GB, have ${dk:-0}GB. Free space or pass --force."
+        fi
     fi
+}
+
+# Re-check the HF-cache FS *after* the image pull (the pull can consume a
+# shared disk). Aborts if the largest model no longer fits.
+post_pull_gate() {
+    local avail; avail=$(free_gb "$HF_CACHE_HOST")
+    if [[ "$FORCE" -eq 0 ]] && { [[ -z "$avail" ]] || (( avail < NEED_MODEL_GB )); }; then
+        die "post-pull: HF cache ($HF_CACHE_HOST) has ${avail:-0}GB free (< ${NEED_MODEL_GB}GB for the largest model). The image pull likely consumed the shared disk. Free space, point HF_CACHE_HOST at a larger disk, or pass --force."
+    fi
+    log "post-pull disk: HF cache ${avail:-0}GB free (need ${NEED_MODEL_GB}GB)"
 }
 
 cleanup_stale() {
@@ -167,18 +219,24 @@ elif [[ "$VENDOR" == "intel" ]]; then
     log "intel: exposing /dev/dri (best-effort)"
 fi
 
-# 4. Disk gates
-check_disk "$HF_CACHE_HOST" "$MIN_HF_GB"   "HF cache"
-check_disk "/var/lib/docker" "$MIN_DOCKER_GB" "docker root"
+# 4. Pre-flight disk gate (hard unless --force)
+disk_gate
 
 # 5. Host ownership
 HOST_UID="$(id -u)"; HOST_GID="$(id -g)"
 
-# 6. Cleanup + pull
+# 6. Cleanup + pull + post-pull disk gate
 if [[ "$DRY_RUN" != "1" ]]; then
     cleanup_stale
     log "pulling $IMAGE (no-op if present) ..."
-    docker pull "$IMAGE" || log "WARN: docker pull failed (using local image?)"
+    if ! docker pull "$IMAGE"; then
+        if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            log "WARN: docker pull failed but image present locally — using it"
+        else
+            die "docker pull failed and no local $IMAGE — check network / registry access"
+        fi
+    fi
+    post_pull_gate
 fi
 
 # 7. Launch
