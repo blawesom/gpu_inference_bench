@@ -14,7 +14,8 @@
 #   ./bench.sh --dry-run                # print the docker command, don't run
 #   ./bench.sh --force                  # skip the disk-space gate
 #
-# Outputs land in ./results (report.json + report.md + raw bench/telemetry JSON).
+# Outputs land in ./results/<YYYYMMDD-HHMMSS>_<gpu-slug>/ (one dir per run,
+# no collisions; report.json + report.md + raw bench/telemetry JSON inside).
 set -uo pipefail
 
 # ── constants ────────────────────────────────────────────────────────────────
@@ -188,6 +189,10 @@ cleanup_stale() {
 # ── main ─────────────────────────────────────────────────────────────────────
 command -v docker >/dev/null 2>&1 || die "docker not found"
 
+# Per-run output dir id: host timestamp (passed to the container; run_matrix.py
+# appends the GPU-model slug after in-container GPU selection).
+RUN_ID="$(date +%Y%m%d-%H%M%S)"
+
 # 1. Vendor
 if [[ -z "$VENDOR" ]]; then
     VENDOR=$(detect_vendor)
@@ -253,6 +258,7 @@ DOCKER_CMD=(docker run --rm --name "$CONTAINER_NAME" --entrypoint bash
     -e KEEP_WEIGHTS="$KEEP_WEIGHTS"
     -e HF_HOME=/hf-cache
     -e RESULTS=/results
+    -e RUN_ID="$RUN_ID"
     -e HOST_UID="$HOST_UID"
     -e HOST_GID="$HOST_GID"
     -e SERVER_START_TIMEOUT="$START_TIMEOUT"
@@ -270,16 +276,28 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 mkdir -p "$RESULTS_DIR" "$HF_CACHE_HOST"
+# Remove any stale .latest from a previous run so a failed new run can't
+# be misreported as the old one (run_matrix.py rewrites it on success).
+rm -f "$RESULTS_DIR/.latest"
 log "launching container ($CONTAINER_NAME) ..."
 log "results → $RESULTS_DIR"
 "${DOCKER_CMD[@]}"
 RC=$?
 echo
 log "container exited rc=$RC"
-if [[ -f "$RESULTS_DIR/report.md" ]]; then
-    log "report: $RESULTS_DIR/report.md"
+# Locate this run's dir (container writes the run-id basename to
+# $RESULTS_DIR/.latest; fall back to legacy top-level report.md).
+LATEST="$(cat "$RESULTS_DIR/.latest" 2>/dev/null || true)"
+RUN_DIR=""
+if [[ -n "$LATEST" && -d "$RESULTS_DIR/$LATEST" && -f "$RESULTS_DIR/$LATEST/report.md" ]]; then
+    RUN_DIR="$RESULTS_DIR/$LATEST"
+elif [[ -f "$RESULTS_DIR/report.md" ]]; then
+    RUN_DIR="$RESULTS_DIR"
+fi
+if [[ -n "$RUN_DIR" ]]; then
+    log "report: $RUN_DIR/report.md"
     echo "────────────────────────────────────────────────────────────"
-    cat "$RESULTS_DIR/report.md"
+    cat "$RUN_DIR/report.md"
     echo "────────────────────────────────────────────────────────────"
 fi
 exit "$RC"

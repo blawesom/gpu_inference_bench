@@ -120,6 +120,8 @@ def _build_report(cells: list[dict], out_dir: Path) -> dict:
     return {
         "metadata": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "run_id": out_dir.name,
+            "gpu": next((c.get("gpu") for c in cells if c.get("gpu")), None),
             "vllm_version": "v0.28.0",
             "total_cells": len(cells),
             "total_rows": len(rows),
@@ -141,7 +143,9 @@ def _write_md(report: dict, out_dir: Path) -> None:
     rows = report["rows"]
     L = []
     L.append("# GPU Inference Bench Report\n")
-    L.append(f"**vLLM {meta['vllm_version']}** · {meta['generated_at']}\n")
+    gpu = meta.get("gpu")
+    L.append(f"**{gpu or 'GPU'}** · Run: {meta['run_id']} · "
+             f"vLLM {meta['vllm_version']} · {meta['generated_at']}\n")
     L.append("| Metric | Value |")
     L.append("|---|---|")
     for k, label in [

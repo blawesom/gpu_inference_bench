@@ -40,10 +40,19 @@ echo "--- run_matrix ---"
 python3 /bench/container/run_matrix.py "${ARGS[@]}"
 MATRIX_RC=$?
 
+# Locate this run's directory. run_matrix.py writes the run-id basename to
+# $RESULTS/.latest (per-run dir: <YYYYMMDD-HHMMSS>_<gpu-slug>/); fall back to
+# $RESULTS itself for dry-runs / older layouts.
+RUN_ID="$(cat "$RESULTS/.latest" 2>/dev/null || true)"
+RUN_DIR="$RESULTS"
+if [[ -n "$RUN_ID" && -d "$RESULTS/$RUN_ID" ]]; then
+    RUN_DIR="$RESULTS/$RUN_ID"
+fi
+
 echo "--- report ---"
-if [[ -f "$RESULTS/cells.json" ]]; then
-    python3 /bench/container/report.py --cells "$RESULTS/cells.json" \
-        --out "$RESULTS" || echo "WARN: report.py failed (cells.json present)"
+if [[ -f "$RUN_DIR/cells.json" ]]; then
+    python3 /bench/container/report.py --cells "$RUN_DIR/cells.json" \
+        --out "$RUN_DIR" || echo "WARN: report.py failed (cells.json present)"
 else
     echo "WARN: no cells.json — skipping report"
 fi
@@ -54,5 +63,5 @@ if [[ "${HOST_UID:-0}" != "0" ]]; then
     chown -R "${HOST_UID}:${HOST_GID:-${HOST_UID}}" "$HF_HOME" 2>/dev/null || true
 fi
 
-echo "=== entrypoint done (run_matrix rc=$MATRIX_RC) ==="
+echo "=== entrypoint done (run_matrix rc=$MATRIX_RC) → $RUN_DIR ==="
 exit "$MATRIX_RC"

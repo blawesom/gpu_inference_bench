@@ -56,7 +56,7 @@ gpu_inference_bench/
 │   ├── run_matrix.py         # orchestration: server lifecycle, bench sweeps
 │   ├── telemetry.py          # per-vendor 1 Hz GPU sampler
 │   └── report.py             # aggregate → report.json + report.md
-├── results/                  # output (gitignored)
+├── results/                  # output (gitignored); per-run subdirs, .latest pointer
 ├── PLAN.md
 └── README.md
 ```
@@ -292,7 +292,17 @@ failing.
 
 ## 8. Report Output
 
-`results/<YYYYMMDD-HHMMSS>_<vendor>_<gpu-slug>/`
+`results/<YYYYMMDD-HHMMSS>_<gpu-slug>/` — e.g.
+`results/20260902-160512_nvidia-geforce-rtx-4090/`
+
+- **One sub-directory per run**, created *in-container* by `run_matrix.py`
+  right after GPU selection, so the GPU model name in the slug is the card
+  actually benchmarked. The timestamp is the host start time (bench.sh passes
+  `RUN_ID`); a collision (same second + same GPU) is disambiguated with a
+  `-2`, `-3`, … suffix. Repeated runs therefore never overwrite each other.
+- The run-id basename is written to `results/.latest`, which `entrypoint.sh`
+  (in-container report step) and `bench.sh` (final report echo) use to locate
+  the current run. `report.json`/`report.md` metadata carries `run_id` + `gpu`.
 
 | File                | Content                                              |
 |---------------------|------------------------------------------------------|
@@ -308,7 +318,7 @@ failing.
 ```json
 {
   "schema_version": "2.0",
-  "run_id": "20260902-120000_nvidia_rtx4090",
+  "run_id": "20260902-120000_nvidia-geforce-rtx-4090",
   "environment": {
     "vendor": "nvidia",
     "gpu": "NVIDIA GeForce RTX 4090",

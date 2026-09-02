@@ -1,9 +1,15 @@
 # gpu_inference_bench
 
-Platform-agnostic GPU inference benchmark: one shell script (`bench.sh`, in
-progress) detects the local GPU (NVIDIA / AMD / Intel), pulls the pinned vLLM
-image for that vendor, runs the inference stack + a 4-model benchmark matrix
+Platform-agnostic GPU inference benchmark: one shell script (`bench.sh`)
+detects the local GPU (NVIDIA / AMD / Intel), pulls the pinned vLLM image
+for that vendor, runs the inference stack + a 4-model benchmark matrix
 (32–40 GB VRAM fleet), and produces a standalone per-machine report.
+
+- **Per-run output directory:** results land in
+  `results/<YYYYMMDD-HHMMSS>_<gpu-model>/` (e.g.
+  `results/20260902-160512_radeon-rx-7900-xtx/`), created in-container after
+  GPU selection. Repeated runs never collide — each run gets its own dir;
+  `results/.latest` points at the most recent one.
 
 - **`PLAN.md`** — the full design (reviewed & final, v3.1): model matrix,
   optimization configs, workload, report schema, script flow, error handling.

@@ -9,7 +9,9 @@ Runs INSIDE the vLLM container. For each (model, config) cell:
      `vllm bench serve` per level with a 1 Hz GPU telemetry sample in flight.
   5. Kill the server; delete the model weights (unless --keep-weights).
 
-Output (in /results):
+Output (in a per-run dir /results/<YYYYMMDD-HHMMSS>_<gpu-slug>/, created
+after GPU selection so repeated runs never collide; /results/.latest holds
+the run-id basename for entrypoint.sh / bench.sh):
   server_<model>_<config>.log          raw vLLM server log per cell
   bench_<model>_<config>_<C>.json      raw `vllm bench serve` output
   telemetry_<model>_<config>_<C>.json  1 Hz GPU samples for that level
@@ -33,6 +35,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from urllib import request as urlrequest
 from urllib.error import URLError
@@ -63,6 +66,54 @@ def _run_cmd(cmd: list[str], env: dict | None = None, timeout: float = 20.0) -> 
     except (OSError, subprocess.SubprocessError):
         pass
     return None
+
+
+def slugify(name: str) -> str:
+    """Lowercase, non-alphanumeric → hyphen."""
+    s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return s or "gpu"
+
+
+def gpu_name(vendor: str, idx: int | None = None) -> str:
+    """Best-effort GPU model name for the per-run directory slug.
+
+    Never raises — falls back to ``<vendor>-gpu`` if no CLI is available
+    or the output is unparseable.
+    """
+    vendor = (vendor or "auto").lower()
+    if vendor == "nvidia":
+        i = idx if idx is not None else 0
+        out = _run_cmd(["nvidia-smi", "--query-gpu=name",
+                        "--format=csv,noheader", "-i", str(i)])
+        return (out or "").strip() or f"nvidia-gpu"
+    if vendor == "amd":
+        env = {k: v for k, v in os.environ.items()
+               if k != "HIP_VISIBLE_DEVICES"}
+        out = _run_cmd(["rocm-smi", "--showproductname"], env=env,
+                       timeout=30.0)
+        if out:
+            pat = rf"GPU\[{idx}\]" if idx is not None else r"GPU\[\d+\]"
+            for line in out.splitlines():
+                m = re.match(rf"{pat}\s*:\s*(.+)", line)
+                if m:
+                    name = m.group(1).strip()
+                    # first line after the vendor name; if it looks like an
+                    # error (e.g. "get_name, Error when calling libdrm")
+                    # or N/A, keep the first non-error field as fallback
+                    if "Error" not in name and "N/A" not in name:
+                        return name
+        return f"amd-gpu"
+    if vendor == "intel":
+        out = _run_cmd(["xpu-smi", "discovery"], timeout=30.0)
+        if out:
+            m = re.search(
+                r"^\s*\|(?:\s*(?:iGPU|dGPU|Discrete GPU))"
+                r"\s*\|\s*\d+\s*\|\s*([^|]+?)\s*\|",
+                out, re.M)
+            if m:
+                return m.group(1).strip()
+        return "intel-gpu"
+    return f"{vendor}-gpu"
 
 
 def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
@@ -399,9 +450,22 @@ def main() -> int:
     results = Path(args.results)
     results.mkdir(parents=True, exist_ok=True)
 
+    # ── per-run sub-directory (created after GPU selection so the name
+    #    includes the actual GPU model; repeated runs never collide).     ──
     gpu_index: int | None = None
+    gpu: str | None = None
+    run_dir = results
     if not args.dry_run:
         gpu_index = select_gpu(args.vendor, args.gpu_index)
+        gpu = gpu_name(args.vendor, gpu_index)
+        ts = os.environ.get("RUN_ID") or datetime.now().strftime(
+            "%Y%m%d-%H%M%S")
+        base = f"{ts}_{slugify(gpu)}"
+        run_dir, n = results / base, 2
+        while run_dir.exists():
+            run_dir, n = results / f"{base}-{n}", n + 1
+        run_dir.mkdir(parents=True)
+        print(f"[run_matrix] run dir: {run_dir}")
 
     all_cells: list[dict] = []
     for mk in model_keys:
@@ -411,17 +475,27 @@ def main() -> int:
         model = models[mk]
         sel = names or model.get("configs", list(configs_by_name.keys()))
         cfgs = [configs_by_name[n] for n in sel if n in configs_by_name]
-        all_cells.extend(run_model(mk, model, cfgs, workload, common, results,
+        all_cells.extend(run_model(mk, model, cfgs, workload, common,
+                                   run_dir,
                                    args.vendor, gpu_index, concurrencies,
                                    args.start_timeout, args.keep_weights,
                                    args.dry_run))
 
-    (results / "cells.json").write_text(json.dumps(all_cells, indent=2))
+    # attach GPU name to every cell for report.py
+    for c in all_cells:
+        if gpu:
+            c["gpu"] = gpu
+    (run_dir / "cells.json").write_text(json.dumps(all_cells, indent=2))
+    if not args.dry_run:
+        # pointer for entrypoint.sh / bench.sh (basename only — each side
+        # joins with its own $RESULTS path)
+        (results / ".latest").write_text(run_dir.name + "\n")
     n_ok = sum(1 for c in all_cells if c["status"] == "ok")
     n_skip = sum(1 for c in all_cells if c["status"].startswith("skipped"))
     n_fail = sum(1 for c in all_cells if c["status"] == "failed")
     print(f"\n[run_matrix] {n_ok} ok, {n_skip} skipped, {n_fail} failed "
-          f"of {len(all_cells)} cells → {results / 'cells.json'}")
+          f"of {len(all_cells)} cells → {run_dir / 'cells.json'}")
+    print(f"[run_matrix] RUN_DIR={run_dir}")
     return 1 if n_fail and not args.dry_run else 0
 
 
