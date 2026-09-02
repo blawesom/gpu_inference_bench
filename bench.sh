@@ -21,7 +21,10 @@ set -uo pipefail
 VLLM_VERSION="${VLLM_VERSION:-v0.28.0}"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_DIR="${RESULTS_DIR:-$REPO_DIR/results}"
-HF_CACHE_HOST="${HF_CACHE_HOST:-$HOME/.cache/gpu-bench/hf}"
+# HF model cache defaults to the project folder (keeps it out of the root disk
+# / $HOME and co-locates it with the repo). Override with HF_CACHE_HOST to place
+# it on a dedicated large volume.
+HF_CACHE_HOST="${HF_CACHE_HOST:-$REPO_DIR/.hf-cache}"
 CONTAINER_NAME="gpu-bench"
 # Disk gates (GB).
 #   NEED_MODEL_GB        — HF cache: one model at a time (largest ~24.4 GB,

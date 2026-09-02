@@ -2,6 +2,7 @@
 results/
 spike-out/
 spike-hf-cache/
+.hf-cache/
 
 # python
 __pycache__/
