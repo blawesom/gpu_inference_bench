@@ -271,7 +271,7 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
             proc = subprocess.run(b_cmd, capture_output=True, text=True)
             wall = time.time() - t0
             if sampler:
-                samples = sampler.stop(samples)
+                samples = sampler.stop()
             telem_out = results / f"telemetry_{tag}_{c}.json"
             telem = sampler.aggregate(samples) if (sampler and samples) else None
             if telem_out and telem is not None:
