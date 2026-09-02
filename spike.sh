@@ -129,9 +129,9 @@ pick_gpu "$VENDOR"
 if (( GPU_IDX >= 0 )); then log "gpu: index $GPU_IDX — $GPU_DESC"; else log "gpu: $GPU_DESC"; fi
 
 case "$VENDOR" in
-  nvidia) IMAGE="vllm/vllm-openai:$IMAGE_TAG";     GPU_FLAGS=(--gpus "device=$GPU_IDX") ; GPU_ENV=(CUDA_VISIBLE_DEVICES=$GPU_IDX) ;;
-  amd)    IMAGE="vllm/vllm-openai-rocm:$IMAGE_TAG"; GPU_FLAGS=(--device=/dev/kfd --device=/dev/dri --group-add=video --security-opt seccomp=unconfined); GPU_ENV=() ;;  # index chosen in-container (S0)
-  intel)  IMAGE="vllm/vllm-openai-xpu:$IMAGE_TAG";  GPU_FLAGS=(--device=/dev/dri --group-add=video); GPU_ENV=(ONEAPI_DEVICE_SELECTOR=0) ;;
+  nvidia) IMAGE="vllm/vllm-openai:$IMAGE_TAG";     GPU_FLAGS=(--gpus "device=$GPU_IDX") ; GPU_ENV_ARGS=(-e "CUDA_VISIBLE_DEVICES=$GPU_IDX") ;;
+  amd)    IMAGE="vllm/vllm-openai-rocm:$IMAGE_TAG"; GPU_FLAGS=(--device=/dev/kfd --device=/dev/dri --group-add=video --security-opt seccomp=unconfined); GPU_ENV_ARGS=() ;;  # index chosen in-container (S0); array stays empty so no dangling -e
+  intel)  IMAGE="vllm/vllm-openai-xpu:$IMAGE_TAG";  GPU_FLAGS=(--device=/dev/dri --group-add=video); GPU_ENV_ARGS=(-e "ONEAPI_DEVICE_SELECTOR=0") ;;
 esac
 log "image: $IMAGE"
 
@@ -160,7 +160,7 @@ docker run -i --rm \
   -v "$OUT_DIR:/out" \
   -v "$HF_CACHE:/hf-cache" \
   -e HF_HOME=/hf-cache \
-  -e "${GPU_ENV[@]}" \
+  "${GPU_ENV_ARGS[@]}" \
   -e EXPECTED_VRAM_MB="$GPU_VRAM_MB" \
   -e EXPECTED_GPU_IDX="$GPU_IDX" \
   -e MIN_VRAM_MB="$MIN_VRAM_MB" \
