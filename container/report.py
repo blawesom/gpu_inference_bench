@@ -81,7 +81,7 @@ def _build_report(cells: list[dict], out_dir: Path) -> dict:
     rows: list[dict[str, Any]] = []
     for cell in cells:
         model = cell.get("model_id", "")
-        config = cell.get("config_name", "")
+        config = cell.get("config", "")
         cell_status = cell.get("status", "unknown")
         cell_reason = cell.get("reason")
         for c_str, level in sorted(
