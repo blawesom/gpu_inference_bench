@@ -21,6 +21,10 @@
 #   ./spike.sh --gpu-index 1      # AMD: force the in-container HIP index
 #   IMAGE_TAG=v0.27.1 ./spike.sh  # try a different pinned tag
 #
+# At launch it cleans previous-run state: orphaned spike container, model
+# cache ($HF_CACHE/hub), and stale vllm spike images (current tag is kept
+# to avoid a ~25 GB re-pull).
+#
 # Outputs: ./spike-out/  (step logs, bench JSON, summary.txt)
 
 set -euo pipefail
@@ -136,6 +140,16 @@ esac
 log "image: $IMAGE"
 
 command -v docker >/dev/null 2>&1 || { log "ERROR: docker not found"; exit 1; }
+
+# ── clean previous-run state (known starting point + honest disk check) ──────
+log "cleaning previous-run state..."
+docker rm -f gpu-bench-spike >/dev/null 2>&1 || true            # orphaned container (frees the GPU)
+mkdir -p "$HF_CACHE"
+rm -rf "$HF_CACHE/hub"                                          # stale/corrupted model blobs → clean re-download
+for img in $(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E '^vllm/vllm-openai(-rocm|-xpu)?:'); do
+  [[ "$img" == "$IMAGE" ]] && continue                          # keep current tag (avoids ~25 GB re-pull)
+  docker rmi "$img" >/dev/null 2>&1 && log "  removed old image $img" || true
+done
 df_free_gb() { df -BG "$1" 2>/dev/null | awk 'NR==2 {gsub("G",""); print $4}'; }
 NEED_HF_GB=30; NEED_DOCKER_GB=45
 (( SKIP_GPT_OSS )) || NEED_HF_GB=50                    # +gpt-oss-20b 13.8 GB + rebuild headroom
