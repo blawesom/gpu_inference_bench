@@ -111,7 +111,7 @@ log "pulling image..."
 docker pull "$IMAGE"
 
 log "running spike container (~30-45 min). Ctrl-C kills container only."
-docker run --rm \
+docker run -i --rm \
   --name gpu-bench-spike \
   --init \
   --entrypoint bash \
