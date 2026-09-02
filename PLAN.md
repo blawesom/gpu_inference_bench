@@ -436,10 +436,10 @@ workload).
 |---|------|-------|
 | 1 | Plan v3.1 review (this doc) | done |
 | 2 | **Spike:** verify `vllm bench serve` JSON schema, speculative-config flags, `--kv-cache-dtype fp8` support, `--num-warmups` availability in v0.28.0 | **done** — `spike.sh`; JSON schema captured, fp8 KV OK, ngram OK, MTP unsupported for gpt-oss, backend=`openai-chat`+`--endpoint` |
-| 3 | `config/models.yaml` + `run_matrix.py` (server lifecycle, sweep, auto-skip) | |
-| 4 | `telemetry.py` (nvidia-smi / rocm-smi / intel_gpu_top samplers) | |
-| 5 | `report.py` (JSON + Markdown) | |
-| 6 | `bench.sh` (detection, pull, run, exit codes) | |
+| 3 | `config/models.yaml` + `run_matrix.py` (server lifecycle, sweep, auto-skip) | **done** — in-container GPU selection (AMD/`rocm-smi` max-VRAM or `--gpu-index`), weight download/delete, health-wait, skip-reason parse, C-sweep, `cells.json` |
+| 4 | `telemetry.py` (nvidia-smi / rocm-smi / intel_gpu_top samplers) | **done** — 1 Hz sampler; AMD reads unfiltered `rocm-smi` by physical idx; NVIDIA `nvidia-smi -i`; Intel `xpu-smi` best-effort; `start/stop/aggregate` API |
+| 5 | `report.py` (JSON + Markdown) | **done** — maps real v0.28 bench keys (`p50_ttft_ms`…) → normalized schema; per-(cell,C) rows; `report.json` + `report.md` |
+| 6 | `bench.sh` (detection, pull, run, exit codes) | **done** — vendor detect, per-vendor image + GPU args, disk gates, stale cleanup, `docker run --entrypoint bash` → `entrypoint.sh`, `--dry-run` |
 | 7 | Smoke test: `--quick` on NVIDIA (this env or user's box) | |
 | 8 | Full matrix run, NVIDIA | |
 | 9 | Port checks: AMD, Intel (XPU FP8-KV/MTP auto-skip paths exercised) | |
@@ -454,3 +454,5 @@ workload).
 *v3.3 — 2026-09-02 (spike complete on ROCm 7.2.3 target: bench backend is `openai-chat`+`--endpoint /v1/chat/completions`, `--help=all`, `--num-warmups` available, fp8 KV + ngram verified working. MTP dropped from all matrix models. §7 bench command corrected.)*
 *
 *v3.4 — 2026-09-02 (MoE models M2/M4 run `baseline · kv-fp8` only — no speculative decoding; real bench result JSON schema captured from spike, recorded as the report.py field source.)*
+*
+*v3.5 — 2026-09-02 (milestones 3–6 built & mock-tested end-to-end: `config/models.yaml`, `container/run_matrix.py` (in-container GPU select, server lifecycle, C-sweep, weight delete, `cells.json`), `container/telemetry.py` (1 Hz AMD/NVIDIA/Intel), `container/report.py` (real-key mapping, JSON+MD), `container/entrypoint.sh`, `bench.sh` (vendor detect, image+GPU args, disk gates, stale cleanup, `--dry-run`). Full 4-model mock matrix: 10 cells → 20 rows, clean. Next: milestone 7 (real `--quick` smoke on a live GPU).)*
