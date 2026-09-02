@@ -11,6 +11,8 @@
 #   ./bench.sh --gpu-index 1            # force a specific physical GPU
 #   ./bench.sh --keep-weights           # don't delete weights between models
 #   ./bench.sh --vendor amd             # override vendor detection
+#   ./bench.sh --image <repo:tag>       # override the vLLM image
+#   ./bench.sh --cache-dir /big/hf      # HF weights cache directory
 #   ./bench.sh --dry-run                # print the docker command, don't run
 #   ./bench.sh --force                  # skip the disk-space gate
 #
@@ -56,6 +58,7 @@ KEEP_WEIGHTS=0
 START_TIMEOUT="${SERVER_START_TIMEOUT:-900}"
 DRY_RUN=0
 FORCE=0
+IMAGE_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --vendor)        VENDOR="${2:-}"; shift 2 ;;
@@ -75,6 +78,11 @@ while [[ $# -gt 0 ]]; do
         --results)       RESULTS_DIR="${2:-}"; shift 2 ;;
         --results=*)     RESULTS_DIR="${1#*=}"; shift ;;
         --version)       VLLM_VERSION="${2:-$VLLM_VERSION}"; shift 2 ;;
+        --version=*)     VLLM_VERSION="${1#*=}"; shift ;;
+        --image)         IMAGE_OVERRIDE="${2:-}"; shift 2 ;;
+        --image=*)       IMAGE_OVERRIDE="${1#*=}"; shift ;;
+        --cache-dir)     HF_CACHE_HOST="${2:-}"; shift 2 ;;
+        --cache-dir=*)   HF_CACHE_HOST="${1#*=}"; shift ;;
         --dry-run)       DRY_RUN=1; shift ;;
         --force)         FORCE=1; shift ;;
         -h|--help)       usage ;;
@@ -208,6 +216,7 @@ case "$VENDOR" in
     amd)    IMAGE="vllm/vllm-openai-rocm:${VLLM_VERSION}" ;;
     intel)  IMAGE="vllm/vllm-openai-xpu:${VLLM_VERSION}" ;;
 esac
+[[ -n "$IMAGE_OVERRIDE" ]] && IMAGE="$IMAGE_OVERRIDE"
 log "image: $IMAGE"
 
 # 3. GPU docker args + host-side selection (NVIDIA only)
@@ -230,8 +239,12 @@ fi
 # 4. Pre-flight disk gate (hard unless --force)
 disk_gate
 
-# 5. Host ownership
+# 5. Host ownership + host-side metadata for environment.json
 HOST_UID="$(id -u)"; HOST_GID="$(id -g)"
+HOST_OS="$(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-}" || uname -s)"
+DOCKER_VERSION="$(docker version --format '{{.Server.Version}}' 2>/dev/null)"
+DOCKER_VERSION="${DOCKER_VERSION:-unknown}"
+log "host os: ${HOST_OS:-?} · docker: $DOCKER_VERSION"
 
 # 6. Cleanup + pull + post-pull disk gate
 if [[ "$DRY_RUN" != "1" ]]; then
@@ -246,6 +259,8 @@ if [[ "$DRY_RUN" != "1" ]]; then
     fi
     post_pull_gate
 fi
+# Image ID (digest) after the pull so first runs capture it.
+IMAGE_DIGEST="$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null || echo "")"
 
 # 7. Launch
 DOCKER_CMD=(docker run --rm --name "$CONTAINER_NAME" --entrypoint bash
@@ -259,6 +274,10 @@ DOCKER_CMD=(docker run --rm --name "$CONTAINER_NAME" --entrypoint bash
     -e HF_HOME=/hf-cache
     -e RESULTS=/results
     -e RUN_ID="$RUN_ID"
+    -e HOST_OS="$HOST_OS"
+    -e DOCKER_VERSION="$DOCKER_VERSION"
+    -e IMAGE="$IMAGE"
+    -e IMAGE_DIGEST="$IMAGE_DIGEST"
     -e HOST_UID="$HOST_UID"
     -e HOST_GID="$HOST_GID"
     -e SERVER_START_TIMEOUT="$START_TIMEOUT"
