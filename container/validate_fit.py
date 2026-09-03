@@ -49,9 +49,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from telemetry import TelemetrySampler  # type: ignore
 
 try:
-    from run_matrix import select_gpu, gpu_name, build_server_cmd  # type: ignore
+    from run_matrix import (select_gpu, gpu_name, build_server_cmd,
+                            _expand_model_keys)  # type: ignore
 except ImportError:
-    select_gpu, gpu_name, build_server_cmd = None, None, None  # static-only fallback
+    select_gpu, gpu_name, build_server_cmd = None, None, None
+    _expand_model_keys = None  # static-only fallback
 
 HF_CACHE = os.environ.get("HF_HOME", "/hf-cache")
 HEALTH_PATH = "/health"
@@ -456,7 +458,8 @@ def parse_args() -> argparse.Namespace:
                     help="amd | nvidia | intel | auto (default)")
     p.add_argument("--gpu-index", type=int, default=None,
                     help="physical GPU index (overrides auto-pick by VRAM)")
-    p.add_argument("--models", default=None, help="comma list, e.g. M3,M4")
+    p.add_argument("--models", default=None,
+                   help="comma list with optional range, e.g. M3,M4 or M1-M4")
     p.add_argument("--start-timeout", type=int, default=DEFAULT_START_TIMEOUT,
                     help="server health-wait budget in seconds")
     p.add_argument("--overhead-gib", type=float, default=None,
@@ -476,7 +479,10 @@ def main() -> int:
     configs_by_name = {n: {**c, "name": n} for n, c in doc.get("configs", {}).items()}
 
     if args.models:
-        model_keys = [m.strip() for m in args.models.split(",") if m.strip()]
+        if _expand_model_keys is not None:
+            model_keys = _expand_model_keys(args.models, list(models.keys()))
+        else:
+            model_keys = [m.strip() for m in args.models.split(",") if m.strip()]
     else:
         model_keys = list(models.keys())
 

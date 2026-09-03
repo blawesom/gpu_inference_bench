@@ -279,6 +279,30 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
                      f"(expect amd|nvidia|intel)")
 
 
+def _expand_model_keys(raw: str, known_keys: list[str]) -> list[str]:
+    """Expand a comma-/range-separated model list into concrete keys.
+
+    Supports: ``M1,M2``, ``M1-M4``, ``M2,M3-M4``, ``M4-M2`` (reverse order
+    is allowed — it just follows the config's natural order).
+    Unknown keys are passed through unchanged.
+    """
+    result: list[str] = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        m = re.match(r"^(M\d+)-(M\d+)$", token)
+        if m:
+            start_key, end_key = m.group(1), m.group(2)
+            start_idx = next(i for i, k in enumerate(known_keys) if k == start_key)
+            end_idx = next(i for i, k in enumerate(known_keys) if k == end_key)
+            result.extend(known_keys[start_idx:end_idx + 1] if start_idx <= end_idx
+                          else known_keys[end_idx:start_idx + 1])
+        else:
+            result.append(token)
+    return result
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="GPU inference benchmark orchestrator (runs inside the vLLM "
@@ -295,7 +319,8 @@ def parse_args() -> argparse.Namespace:
                    help="GPU vendor (auto-detects from telemetry CLIs)")
     p.add_argument("--gpu-index", type=int, default=None,
                    help="physical GPU index (overrides auto-pick by VRAM)")
-    p.add_argument("--models", default=None, help="comma list, e.g. M1,M2")
+    p.add_argument("--models", default=None,
+                   help="comma-/range-separated model list, e.g. M1,M2 or M1-M4")
     p.add_argument("--configs", default=None, help="comma list, e.g. baseline,kv-fp8")
     p.add_argument("--concurrency", default=None, help="comma list, e.g. 1,8,16")
     p.add_argument("--keep-weights", action="store_true",
@@ -490,8 +515,9 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
         "model": model_key, "model_id": model["id"], "config": cfg["name"],
         "status": "failed", "reason": None,
         "server_flags": {
-            "max_model_len": model["max_model_len"],
-            "gpu_memory_utilization": common.get("gpu_memory_utilization", 0.90),
+            "max_model_len": model.get("max_model_len", common.get("max-model-len", 8192)),
+            "gpu_memory_utilization": model.get("gpu_memory_utilization",
+                                                common.get("gpu_memory_utilization", 0.90)),
             **{f.replace("-", "_"): v for f, v in (cfg.get("flags") or {}).items()},
         },
         "server_log": server_log.name,
@@ -599,7 +625,7 @@ def main() -> int:
             list(models.keys()), None,
             list(workload.get("concurrency_levels", [1, 4, 8, 16])))
     if args.models:
-        model_keys = [m.strip() for m in args.models.split(",") if m.strip()]
+        model_keys = _expand_model_keys(args.models, list(models.keys()))
     if args.concurrency:
         concurrencies = [int(c) for c in args.concurrency.split(",") if c.strip()]
     if args.configs:

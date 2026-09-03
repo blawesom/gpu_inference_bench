@@ -54,7 +54,8 @@ container that runs the full model × config matrix.
 
 OPTIONS:
   --quick                 Smoke test: M1 only, baseline+kv-fp8, C=1,8
-  --models <csv>          Subset of models, comma list (e.g. M2,M4). Default: all
+  --models <csv>          Subset of models, comma-/range-separated
+                          (e.g. M2,M4 or M1-M4). Default: all
   --configs <csv>         Subset of configs, comma list (e.g. baseline,kv-fp8)
   --concurrency <csv>     Concurrency sweep, comma list (e.g. 1,8,16). Default: 1,4,8,16
   --gpu-index <N>         Force a specific physical GPU index (auto-pick by VRAM)
@@ -84,7 +85,8 @@ ENVIRONMENT OVERRIDES:
 EXAMPLES:
   ./bench.sh                          # full matrix, auto-detect GPU
   ./bench.sh --quick                  # smoke test (M1, ~5 min)
-  ./bench.sh --models M2,M4           # subset of models
+  ./bench.sh --models M2,M4           # subset of models (comma list)
+  ./bench.sh --models M3-M4           # range: M3, M4
   ./bench.sh --validate --models M3,M4  # preflight VRAM-fit check
   ./bench.sh --clean M3,M4            # free M3+M4 weights, then exit
   ./bench.sh --dry-run                # print the docker command, don't run

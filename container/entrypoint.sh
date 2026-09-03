@@ -11,7 +11,7 @@
 # Environment (set by bench.sh):
 #   GPU_VENDOR      amd | nvidia | intel        (required)
 #   GPU_INDEX       physical index override     (optional)
-#   MODELS          comma list, e.g. M1,M2      (optional)
+#   MODELS          comma list, e.g. M1,M2 or M1-M4   (optional)
 #   CONFIGS         comma list, e.g. baseline   (optional)
 #   CONCURRENCY     comma list, e.g. 1,8,16     (optional)
 #   QUICK           1 → M1 only, baseline+kv-fp8, C=1,8
@@ -36,7 +36,7 @@ ENVIRONMENT (required):
 
 ENVIRONMENT (optional):
   GPU_INDEX           physical GPU index override
-  MODELS              comma list, e.g. M1,M2  (default: all)
+  MODELS              comma list (ranges ok), e.g. M1,M2 or M1-M4  (default: all)
   CONFIGS             comma list, e.g. baseline
   CONCURRENCY         comma list, e.g. 1,8,16
   QUICK               1 → M1 only, baseline+kv-fp8, C=1,8
