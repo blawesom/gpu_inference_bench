@@ -486,16 +486,32 @@ def main() -> int:
     else:
         model_keys = list(models.keys())
 
-    # Determine vram
-    vram_gb = args.vram_gb
-    gpu_idx = None
     vendor = (args.vendor or "auto").lower()
+
+    # Auto-select GPU for probe mode first, so VRAM detection below can target
+    # the selected card on multi-GPU hosts (rocm-smi's first row is GPU 0).
+    probe_mode = True
+    gpu_idx = None
+    gpu_name_str = f"{vendor}-gpu"
+    if args.no_probe or select_gpu is None:
+        probe_mode = False
+        if not args.quiet:
+            print(f"[validate] static-only mode (no GPU selected, --no-probe)")
+    else:
+        gpu_idx = select_gpu(vendor, args.gpu_index)
+        gpu_name_str = gpu_name(vendor, gpu_idx) or f"{vendor}-gpu"
+
+    # Determine vram (index-aware on multi-GPU AMD hosts)
+    vram_gb = args.vram_gb
     if not vram_gb:
         if vendor == "amd":
             env = {k: v for k, v in os.environ.items() if k != "HIP_VISIBLE_DEVICES"}
             out = subprocess.run(["rocm-smi", "--showmeminfo", "vram"],
                                  capture_output=True, text=True, env=env, timeout=30).stdout
-            m = re.search(r"VRAM Total Memory \(B\): (\d+)", out)
+            pat = (rf"GPU\[{gpu_idx}\].*?VRAM Total Memory \(B\): (\d+)"
+                   if gpu_idx is not None
+                   else r"VRAM Total Memory \(B\): (\d+)")
+            m = re.search(pat, out or "")
             if m:
                 vram_gb = int(m.group(1)) / 1024**3
             else:
@@ -510,17 +526,6 @@ def main() -> int:
                 vram_gb = 32.0
         else:
             vram_gb = 32.0
-
-    # Auto-select GPU for probe mode
-    probe_mode = True
-    gpu_name_str = f"{vendor}-gpu"
-    if args.no_probe or select_gpu is None:
-        probe_mode = False
-        if not args.quiet:
-            print(f"[validate] static-only mode (no GPU selected, --no-probe)")
-    else:
-        gpu_idx = select_gpu(vendor, args.gpu_index)
-        gpu_name_str = gpu_name(vendor, gpu_idx) or f"{vendor}-gpu"
 
     # Calibrate overhead from past run
     results = Path(args.results)
