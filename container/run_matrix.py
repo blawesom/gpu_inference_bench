@@ -7,7 +7,8 @@ Runs INSIDE the vLLM container. For each (model, config) cell:
   3. On startup failure, parse the server log → mark cell skipped:<reason>.
   4. On success, run the concurrency sweep (C=1,4,8,16), calling
      `vllm bench serve` per level with a 1 Hz GPU telemetry sample in flight.
-  5. Kill the server; delete the model weights (unless --keep-weights).
+  5. Kill the server; weights are KEPT for re-runs (delete with --delete-weights
+     or run clean.sh).
 
 Output (in a per-run dir /results/<YYYYMMDD-HHMMSS>_<gpu-slug>/, created
 after GPU selection so repeated runs never collide; /results/.latest holds
@@ -22,7 +23,7 @@ Usage (from entrypoint.sh):
   python3 /bench/container/run_matrix.py \
       --config /bench/config/models.yaml \
       --results /results \
-      --vendor amd [--models M1,M2] [--keep-weights] [--quick]
+      --vendor amd [--models M1,M2] [--delete-weights] [--quick]
 """
 
 from __future__ import annotations
@@ -288,7 +289,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--models", default=None, help="comma list, e.g. M1,M2")
     p.add_argument("--configs", default=None, help="comma list, e.g. baseline,kv-fp8")
     p.add_argument("--concurrency", default=None, help="comma list, e.g. 1,8,16")
-    p.add_argument("--keep-weights", action="store_true")
+    p.add_argument("--keep-weights", action="store_true",
+                   help="no-op, kept for backward compatibility "
+                        "(weights are kept by default now)")
+    p.add_argument("--delete-weights", action="store_true",
+                   help="delete model weights from the HF cache after each "
+                        "model (old behavior; off by default so re-runs skip "
+                        "the ~20-25 GB re-download). Use clean.sh for a one-shot "
+                        "manual cleanup instead.")
     p.add_argument("--quick", action="store_true",
                    help="M1 only, baseline+kv-fp8, concurrency 1,8")
     p.add_argument("--start-timeout", type=int, default=DEFAULT_START_TIMEOUT)
@@ -535,7 +543,7 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
 def run_model(model_key: str, model: dict, cfgs: list[dict], workload: dict,
               common: dict, results: Path, vendor: str, gpu_index: int | None,
               concurrencies: list[int], start_timeout: int,
-              keep_weights: bool, dry_run: bool) -> list[dict]:
+              delete_weights: bool, dry_run: bool) -> list[dict]:
     cells = []
     if not dry_run:
         print(f"[model {model_key}] downloading {model['id']} ...")
@@ -552,11 +560,18 @@ def run_model(model_key: str, model: dict, cfgs: list[dict], workload: dict,
     for cfg in cfgs:
         cells.append(run_cell(model_key, model, cfg, workload, common, results,
                               vendor, gpu_index, concurrencies, start_timeout, dry_run))
-    if not dry_run and not keep_weights:
+    # Weights are KEPT by default so re-runs skip the re-download. Only remove
+    # them when --delete-weights is passed (old behavior).
+    if not dry_run and delete_weights:
         removed = delete_weights(model["id"])
         for c in cells:
             c["weights_removed"] = removed
         print(f"[model {model_key}] weights removed: {removed}")
+    else:
+        for c in cells:
+            c["weights_removed"] = False
+        print(f"[model {model_key}] weights kept (re-run skips download; "
+              f"run clean.sh to free ~{model.get('weights_gb', '?')} GB)")
     return cells
 
 
@@ -618,7 +633,7 @@ def main() -> int:
         all_cells.extend(run_model(mk, model, cfgs, workload, common,
                                    run_dir,
                                    args.vendor, gpu_index, concurrencies,
-                                   args.start_timeout, args.keep_weights,
+                                   args.start_timeout, args.delete_weights,
                                    args.dry_run))
 
     # attach GPU name to every cell for report.py

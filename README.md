@@ -21,7 +21,7 @@ host:  bench.sh
         │
 container: container/entrypoint.sh → container/run_matrix.py
   5. select GPU  in-container (largest VRAM, or --gpu-index)
-  6. for each model (download → test → delete weights):
+  6. for each model (download → test; weights kept in cache):
        for each config:
          vllm serve <model> <config flags>  →  wait /health
            failure → parse log → cell skipped:<reason>, continue
@@ -43,8 +43,9 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
   - **NVIDIA**: driver + `nvidia-container-toolkit`
   - **AMD**: ROCm kernel driver (`amdgpu` with KFD)
   - **Intel**: XPU stack (`xpu-smi` / Level Zero)
-- Disk: ~65 GB free (image ~25–35 GB + one model at a time ~25 GB).
-  `bench.sh` gates this automatically (`--force` to override; `--cache-dir`
+- Disk: ~100 GB free on the first run (image ~25–35 GB + all model weights ~80 GB
+  kept for re-runs).  With `--delete-weights` only ~65 GB is needed (one model at a
+  time). `bench.sh` gates this automatically (`--force` to override; `--cache-dir`
   to put weights on a bigger volume).
 - Network: Docker Hub + Hugging Face (all default models are ungated)
 
@@ -61,7 +62,8 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
 ./bench.sh --image vllm/vllm-openai:v0.28.0   # override the image
 ./bench.sh --cache-dir /big/disk/hf           # HF weights cache location
 ./bench.sh --results /tmp/out                # output root
-./bench.sh --keep-weights                   # don't delete weights per model
+./bench.sh --delete-weights                   # delete weights after each model (old behavior)
+./bench.sh --clean [M1,M2,...]                # remove cached weights, then exit
 ./bench.sh --start-timeout 1200             # server health-wait budget (s)
 ./bench.sh --validate --models M3,M4        # preflight VRAM-fit check (static+live probe)
 ./bench.sh --dry-run                        # print the docker command, stop
@@ -180,10 +182,22 @@ The report is written either way.
 
 ## Storage behavior
 
-Test machines are expected to have limited disk, so weights are **deleted
-after each model** finishes (all its cells done, ok or failed). Peak disk ≈
-image + one model + logs. `--keep-weights` disables deletion (debugging, or
-re-running a single model without re-downloading).
+Weights are **kept in the HF cache** after each model finishes, so re-runs
+skip the ~20–25 GB re-download (speeds up iterative runs / A-B testing).
+Peak disk ≈ image + **all** model weights + logs (~100 GB on the first run).
+
+To free disk after a benchmark is done, use **`./clean.sh`**:
+
+```bash
+./clean.sh                    # remove ALL cached weights
+./clean.sh M3,M4              # remove only M3 + M4 (by key from models.yaml)
+./clean.sh "Qwen/Qwen3.5-9B"  # remove by HuggingFace repo ID
+./clean.sh --dry-run          # preview what would be removed
+```
+
+`--delete-weights` (on `bench.sh`) restores the old per-model deletion (peak
+disk back to ~40 GB) — useful when space is very tight.  `--keep-weights`
+remains as a **no-op** for backward compatibility.
 
 ## Troubleshooting
 
@@ -191,7 +205,8 @@ re-running a single model without re-downloading).
 |---|---|
 | `could not detect GPU vendor` | Install the vendor stack (`nvidia-container-toolkit` / AMD KFD / Intel XPU), or pass `--vendor` |
 | `no NVIDIA GPU found` | Check `nvidia-smi -L`; pass `--gpu-index` to pick a card |
-| disk gate aborts | Free space, `--cache-dir <bigger volume>`, or `--force` |
+| disk gate aborts | Weights are kept by default (whole set ≈ 85 GB). Use `--delete-weights` to restore the old one-model-at-a-time footprint, `--cache-dir <bigger volume>`, `./clean.sh` to free space, or `--force` |
+| need to free weight disk | `./clean.sh` (all) or `./clean.sh M1,M2` (specific models) |
 | cell `skipped:oom` | Model + graph + profiling exceed the util budget (vLLM v0.28 counts CUDA-graph memory); run `--validate` to see the exact shortfall, raise the model's `gpu_memory_utilization`, lower `max_model_len` / `max-num-batched-tokens`, or add `enforce-eager` as a last resort |
 | cell `skipped:kv-fp8-unsupported` | Expected on backends without FP8 KV in v0.28.0; not a failure |
 | cell `skipped:unsupported:<…>` | Backend rejected the model/quant format (e.g. **GPTQ on ROCm** — see `server_<model>_<config>.log` for the exact weight line). M4 defaults to the AWQ variant for this reason; `--validate` surfaces the exact error |

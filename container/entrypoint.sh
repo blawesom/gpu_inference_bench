@@ -16,7 +16,8 @@
 #   CONCURRENCY     comma list, e.g. 1,8,16     (optional)
 #   QUICK           1 → M1 only, baseline+kv-fp8, C=1,8
 #   VALIDATE        1 → run the VRAM-fit validator instead of the matrix
-#   KEEP_WEIGHTS    1 → do not delete weights per model
+#   KEEP_WEIGHTS    deprecated no-op (weights are kept by default now)
+#   DELETE_WEIGHTS  1 → delete weights per model (old behavior)
 #   HF_HOME         default /hf-cache
 #   HOST_UID / HOST_GID   for chown (skipped when uid 0)
 set -uo pipefail
@@ -36,6 +37,7 @@ ARGS=(--config /bench/config/models.yaml --results "$RESULTS"
 [[ -n "${CONCURRENCY:-}" ]]   && ARGS+=(--concurrency "$CONCURRENCY")
 [[ "${QUICK:-0}" == "1" ]]    && ARGS+=(--quick)
 [[ "${KEEP_WEIGHTS:-0}" == "1" ]] && ARGS+=(--keep-weights)
+[[ "${DELETE_WEIGHTS:-0}" == "1" ]] && ARGS+=(--delete-weights)
 
 # Validation is a distinct mode: static estimate + optional live probe, no
 # concurrency sweep. validate_fit.py only takes the subset of flags below.

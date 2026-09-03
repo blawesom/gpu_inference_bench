@@ -207,27 +207,30 @@ meaningful perf axis on the random workload, so the MoE models run
   `--enable-prefix-caching` off (it distorts synthetic-token throughput;
   re-enable only in a dedicated `prefix-cache` config if wanted).
 
-### Model lifecycle: download → test → delete (storage bloat prevention)
+### Model lifecycle: download → test → **keep** weights (re-run speed)
 
-Test machines are expected to have limited disk, so weights are **not** kept
-across models:
+Weights are **kept** in the HF cache after each model finishes, so re-runs
+skip the ~20–25 GB re-download.  This speeds up iterative runs (A-B testing,
+config changes, re-validating M3/M4 after a fix).
 
 ```
 for model in M1..M4:
-    hf_download(model)                          # into /hf-cache (bind mount)
+    hf_download(model)                          # into /hf-cache (bind mount); no-op if cached
     for config in model.configs:
         run server + concurrency sweep cells
-    rm -rf /hf-cache/hub/models--<org>--<name>  # after ALL its cells done
+    # weights KEPT (no deletion) — re-run skips download
 ```
 
-- Deletion runs after the model's last cell (ok **or** failed), with a
-  `--keep-weights` escape hatch for debugging. Weights are also kept
-  automatically when the run was started with `--models <single>` (so a
-  re-run of just that model doesn't re-download).
-- Failure to delete → **warn and continue** (never fatal).
-- Peak disk = image ~12 GB + largest weights 24.4 GB + logs ≈ 40 GB →
-  preflight requires **50 GB free** (vs ~120 GB if all weights were retained).
-- `report.json` records per-model weights size and a `weights_removed: true/false` flag.
+- **`./clean.sh`** — standalone host script to remove cached weights
+  (`./clean.sh` for all, `./clean.sh M3,M4` for specific, or by repo ID).
+- **`--delete-weights`** (on `bench.sh`) restores the old per-model deletion
+  when disk is very tight.  `--keep-weights` remains a **no-op** for
+  backward compatibility.
+- Peak disk = image ~12 GB + **all** weights ~78.6 GB + logs ≈ 100 GB on the
+  first run (≈ 40 GB with `--delete-weights`).  Preflight gates ~120 GB
+  (shared-FS) / ~85 GB (model-only) for keep, 65 GB for delete-weights.
+- `report.json` records per-model weights size and a `weights_removed:
+  true/false` flag (false by default now).
 
 ### Total run estimate (full matrix = default)
 
@@ -414,7 +417,7 @@ set -euo pipefail
 # Flags:
 #   --models M1,M2,M3,M4 | --configs baseline,kv-fp8,long-context | --concurrency 1,4,8,16
 #   --image <override>   --vendor <nvidia|amd|intel>              --quick
-#   --keep-weights (debug; default: delete after each model)
+#   --delete-weights (default: keep weights for re-runs; clean.sh to free disk)
 #   --cache-dir <dir>    --results <dir>  --gpu-index N  --start-timeout S
 #   --version <tag>      --dry-run        --force
 
@@ -440,7 +443,7 @@ Container `entrypoint.sh` → `run_matrix.py` implements the §6 loop with:
 - health wait (default 900 s, `--start-timeout`), startup-log parse for skip reasons,
 - GPU telemetry thread (vendor-specific 1 Hz sampler),
 - `subprocess` calls to `vllm serve` / `vllm bench serve`,
-- weight deletion after each model (unless `--keep-weights`),
+- weights KEPT after each model (default; `--delete-weights` to delete),
 - `report.py` aggregation at the end (even on partial failure).
 
 ---
@@ -465,7 +468,8 @@ Container `entrypoint.sh` → `run_matrix.py` implements the §6 loop with:
 (GPTQ-Int4 not supported on ROCm — verified 2026-09-02; GPTQ id kept as
 NVIDIA-only comment) ·
 VRAM floor 32 GB (32–40 GB fleet) · **full matrix is the default (~4 h)** ·
-**weights deleted after each model** (`--keep-weights` to disable) ·
+**weights kept after each model** (`--delete-weights` to delete; `clean.sh`
+to free disk) ·
 power metrics **best-effort** (null when the vendor tool lacks them) ·
 per-machine standalone reports (no cross-run diff mode) ·
 **MTP dropped** — not supported for any matrix model in v0.28.0 (spike); the
@@ -494,7 +498,9 @@ before a full ~4 h run.
 | 8 | Full matrix run, NVIDIA | pending — needs a live GPU box |
 | 9 | Port checks: AMD, Intel (XPU FP8-KV/MTP auto-skip paths exercised) | pending — needs live AMD/Intel boxes |
 | 10 | README + usage examples | **done** |
-| 11 | Live ROCm validation & M3/M4 fix | **done** — see report below; M3 fit flags, M4 AWQ swap, `--validate` preflight |
+| 11 | Live ROCm validation & M3/M4 fix | **done** — M3 fit flags, M4 AWQ swap, `--validate` preflight |
+| 12 | Weight retention for re-runs | **done** — weights kept by default, `clean.sh` standalone, `--delete-weights` opt-in, dynamic disk gate |
+| 12 | Weight retention for re-runs | **done** — weights kept by default, `clean.sh` standalone, `--delete-weights` opt-in, dynamic disk gate |
 
 ---
 
@@ -511,3 +517,5 @@ before a full ~4 h run.
 *v3.6 — 2026-09-02 (implementation finished for the GPU-less build host: per-run output dirs `results/<ts>_<gpu-slug>/` + `.latest`; `environment.json` (GPU/driver/stack/OS/kernel/CPU/RAM/docker/image-id/vLLM) written in-container, best-effort; `cells.json` is now a self-contained manifest (workload/models/cells); `report.json` schema v1.0 (run_id, environment, workload, models, metadata, flat rows); `report.md` env block + per-model tables; `bench.sh` gains `--image`/`--cache-dir`, passes host OS/docker-version/image-id to the container. Milestone 10 done (README). Milestones 7–9 remain: they require live GPU hardware.)*
 *
 *v3.7 — 2026-09-03 (live ROCm 7.2.3 validation, 32 GB card 0x7551, run 20260902-220721. **M3** `skipped:oom` root cause: vLLM v0.28.0 counts CUDA-graph memory against `--gpu-memory-utilization` (default since v0.21.0), so 21 GB weights + ~4.5–7 GB graph/profiling at 8192 ctx exceeds the 0.90×31.9 GB=28.7 GB budget → `Available KV cache memory: −X GiB` → `No available memory for the cache blocks`. Fix: model-level `gpu_memory_utilization 0.95` + `max_model_len 2048` (workload needs 768) + `max-num-batched-tokens 2048`; `long-context` dropped (32 k ctx cannot fit on 32 GB). **M4** `skipped:unsupported:<…>` root cause: GPTQ-Int4 is not supported by the vLLM ROCm backend (server rejects GPTQ attention/expert weights at load). Fix: M4 → `cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit` (same compressed-tensors int4 family as M3; GPTQ id kept as NVIDIA-only comment). New **`--validate` preflight** (`container/validate_fit.py`): static HF-based estimate (hybrid-GDN KV aware) + live server probe that parses vLLM's own sizing lines for a definitive FIT/TIGHT/NO-FIT/UNSUPPORTED verdict; overhead auto-calibrated from the previous run's telemetry. `run_matrix.build_server_cmd` gains model-level `flags` + `gpu_memory_utilization` override (common < model < config). `gpu_name()` strips rocm-smi's raw `Card Model:` prefix. Milestone 11 done.)*
+*
+*v3.8 — 2026-09-03 (weight retention for faster re-runs. Weights are now KEPT in the HF cache after each model (re-runs skip the ~20–25 GB re-download); `--keep-weights` is a deprecated no-op. New **`clean.sh`** host script removes cached weights: `./clean.sh` (all), `./clean.sh M3,M4` (by key), or by HuggingFace repo ID; `--dry-run` previews. **`bench.sh --clean [M1,M2,...]`** is a thin wrapper (cleans + exits, no container). **`bench.sh --delete-weights`** restores the old per-model deletion (peak disk back to ~40 GB). Disk gate is now dynamic: NEED_MODEL_GB=85 (keep, whole weight set) by default, 30 (delete-weights). `run_matrix` takes `--delete-weights` and sets `weights_removed:false` in cells by default. Milestone 12 done.)*
