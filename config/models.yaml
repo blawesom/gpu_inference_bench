@@ -34,6 +34,14 @@ common_server:
   host: 0.0.0.0
   port: 8000
   gpu_memory_utilization: 0.90
+  # Pin max concurrent sequences to the workload ceiling (C=16). Required
+  # for the hybrid Mamba/GDN models: vLLM v0.28 refuses to start when
+  # max_num_seqs (default 256) exceeds the Mamba cache block count — M4 on a
+  # 32 GB card boots with only 21 blocks ("ValueError: max_num_seqs (256)
+  # exceeds available Mamba cache blocks (21)"). M3 gets the same protection
+  # and smaller CUDA-graph captures. Pure-attention M1/M2 are unaffected
+  # (the workload never exceeds 16 in-flight sequences).
+  max_num_seqs: 16
   trust_remote_code: true
   # NOTE: --enable-prefix-caching is intentionally OFF (distorts synthetic
   # token throughput). Do not enable.
@@ -84,10 +92,12 @@ models:
     #
     # Live probe (RX 9070 XT, 31.86 GiB, 0.95 util): model load 20.14 GiB,
     # then CUDA-graph capture OOMed 784 MiB short of the 30.22 GiB budget
-    # with 816 MiB reserved-but-unallocated (fragmentation). bench.sh sets
-    # PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to recover that pool.
-    # Round-2 escape hatch if the probe still OOMs: add
-    # `enforce-eager: true` below (skips CUDA-graph capture entirely).
+    # with 816 MiB reserved-but-unallocated (fragmentation). Two fixes:
+    # bench.sh sets PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to
+    # recover that pool, and common_server max_num_seqs: 16 shrinks the
+    # graph captures (sized for 256 sequences by default). Round-2 escape
+    # hatch if the probe still OOMs: add `enforce-eager: true` below
+    # (skips CUDA-graph capture entirely).
     gpu_memory_utilization: 0.95
     max_model_len: 2048
     flags:
@@ -109,6 +119,12 @@ models:
     # 32 GB fit (largest weights in the matrix). Same levers as M3: 0.95
     # util, 2048 context, capped batch. 24.5 GB leaves little room, so this
     # is the tightest cell — run ./bench.sh --validate first.
+    #
+    # Live probe root cause (RX 9070 XT): NOT an OOM — vLLM v0.28 hybrid
+    # (Mamba/GDN) startup check: "ValueError: max_num_seqs (256) exceeds
+    # available Mamba cache blocks (21)." Each concurrent sequence needs one
+    # Mamba state slot; the tight pool only yields 21. Fixed by
+    # common_server max_num_seqs: 16 (= workload ceiling).
     gpu_memory_utilization: 0.95
     max_model_len: 2048
     flags:

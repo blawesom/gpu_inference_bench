@@ -348,11 +348,16 @@ def build_server_cmd(model: dict, cfg: dict, common: dict) -> list[str]:
 
     Model-level ``flags:`` dict (new) — merged after common, before config flags.
     Model-level ``gpu_memory_utilization:`` — overrides the common setting.
+    ``max_num_seqs:`` (model or common) — emitted as ``--max-num-seqs``. The
+    workload tops out at C=16, and hybrid Mamba/GDN models hard-fail startup
+    when max_num_seqs exceeds their Mamba cache block count (e.g. M4 on a
+    32 GB card: 21 blocks), so the matrix pins it to the workload ceiling.
     ``max-model-len`` — model defaults to config; long-context can override.
     """
     max_len = str(model.get("max_model_len", common.get("max-model-len", 8192)))
     gpu_util = str(model.get("gpu_memory_utilization",
-                            common.get("gpu_memory_utilization", 0.90)))
+                             common.get("gpu_memory_utilization", 0.90)))
+    max_num_seqs = model.get("max_num_seqs", common.get("max_num_seqs"))
     extra: list[str] = []
     # model-level flags (applied between common and config flags)
     for flag, val in (model.get("flags") or {}).items():
@@ -376,6 +381,8 @@ def build_server_cmd(model: dict, cfg: dict, common: dict) -> list[str]:
            "--port", str(common.get("port", 8000)),
            "--max-model-len", max_len,
            "--gpu-memory-utilization", gpu_util]
+    if max_num_seqs is not None:
+        cmd.extend(["--max-num-seqs", str(max_num_seqs)])
     if common.get("trust_remote_code", True):
         cmd.append("--trust-remote-code")
     return cmd + extra
@@ -521,6 +528,8 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
             "max_model_len": model.get("max_model_len", common.get("max-model-len", 8192)),
             "gpu_memory_utilization": model.get("gpu_memory_utilization",
                                                 common.get("gpu_memory_utilization", 0.90)),
+            "max_num_seqs": model.get("max_num_seqs",
+                                      common.get("max_num_seqs", 256)),
             **{f.replace("-", "_"): v for f, v in (cfg.get("flags") or {}).items()},
         },
         "server_log": server_log.name,
