@@ -351,6 +351,12 @@ DOCKER_CMD=(docker run --rm --name "$CONTAINER_NAME" --entrypoint bash
     -e HOST_UID="$HOST_UID"
     -e HOST_GID="$HOST_GID"
     -e SERVER_START_TIMEOUT="$START_TIMEOUT"
+    # The 32 GB matrix lives at the edge of VRAM: on tight cells (M3/M4) the
+    # caching allocator fragments the reserved pool and the last ~1 GiB
+    # (CUDA-graph capture / profiling activation) OOMs. Expandable segments
+    # let PyTorch grow segments instead of stalling on fragmentation (the
+    # remedy in torch's own OOM message; recommended for tight ROCm fits).
+    -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     -v "$REPO_DIR:/bench"
     -v "$HF_CACHE_HOST:/hf-cache"
     -v "$RESULTS_DIR:/results"

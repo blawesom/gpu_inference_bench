@@ -81,6 +81,13 @@ models:
     # overrides claw back headroom: 0.95 util (+~1.6 GB), 2048 context, and a
     # capped prefill/profiling batch. long-context (32k) is removed — a
     # 21 GB model cannot hold 32k context on 32 GB.
+    #
+    # Live probe (RX 9070 XT, 31.86 GiB, 0.95 util): model load 20.14 GiB,
+    # then CUDA-graph capture OOMed 784 MiB short of the 30.22 GiB budget
+    # with 816 MiB reserved-but-unallocated (fragmentation). bench.sh sets
+    # PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to recover that pool.
+    # Round-2 escape hatch if the probe still OOMs: add
+    # `enforce-eager: true` below (skips CUDA-graph capture entirely).
     gpu_memory_utilization: 0.95
     max_model_len: 2048
     flags:
