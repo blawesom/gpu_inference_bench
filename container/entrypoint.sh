@@ -15,6 +15,7 @@
 #   CONFIGS         comma list, e.g. baseline   (optional)
 #   CONCURRENCY     comma list, e.g. 1,8,16     (optional)
 #   QUICK           1 → M1 only, baseline+kv-fp8, C=1,8
+#   VALIDATE        1 → run the VRAM-fit validator instead of the matrix
 #   KEEP_WEIGHTS    1 → do not delete weights per model
 #   HF_HOME         default /hf-cache
 #   HOST_UID / HOST_GID   for chown (skipped when uid 0)
@@ -25,7 +26,7 @@ export HF_HOME="${HF_HOME:-/hf-cache}"
 
 echo "=== entrypoint: vendor=${GPU_VENDOR:-auto} models=${MODELS:-<all>} \
 configs=${CONFIGS:-<all>} conc=${CONCURRENCY:-<all>} quick=${QUICK:-0} \
-keep_weights=${KEEP_WEIGHTS:-0} ==="
+validate=${VALIDATE:-0} keep_weights=${KEEP_WEIGHTS:-0} ==="
 
 ARGS=(--config /bench/config/models.yaml --results "$RESULTS"
       --vendor "${GPU_VENDOR:-auto}")
@@ -36,9 +37,22 @@ ARGS=(--config /bench/config/models.yaml --results "$RESULTS"
 [[ "${QUICK:-0}" == "1" ]]    && ARGS+=(--quick)
 [[ "${KEEP_WEIGHTS:-0}" == "1" ]] && ARGS+=(--keep-weights)
 
-echo "--- run_matrix ---"
-python3 /bench/container/run_matrix.py "${ARGS[@]}"
-MATRIX_RC=$?
+# Validation is a distinct mode: static estimate + optional live probe, no
+# concurrency sweep. validate_fit.py only takes the subset of flags below.
+VAL_ARGS=(--config /bench/config/models.yaml --results "$RESULTS"
+          --vendor "${GPU_VENDOR:-auto}")
+[[ -n "${GPU_INDEX:-}" ]] && VAL_ARGS+=(--gpu-index "$GPU_INDEX")
+[[ -n "${MODELS:-}" ]]    && VAL_ARGS+=(--models "$MODELS")
+
+if [[ "${VALIDATE:-0}" == "1" ]]; then
+    echo "--- validate_fit ---"
+    python3 /bench/container/validate_fit.py "${VAL_ARGS[@]}"
+    MATRIX_RC=$?
+else
+    echo "--- run_matrix ---"
+    python3 /bench/container/run_matrix.py "${ARGS[@]}"
+    MATRIX_RC=$?
+fi
 
 # Locate this run's directory. run_matrix.py writes the run-id basename to
 # $RESULTS/.latest (per-run dir: <YYYYMMDD-HHMMSS>_<gpu-slug>/); fall back to
@@ -50,7 +64,14 @@ if [[ -n "$RUN_ID" && -d "$RESULTS/$RUN_ID" ]]; then
 fi
 
 echo "--- report ---"
-if [[ -f "$RUN_DIR/cells.json" ]]; then
+if [[ "${VALIDATE:-0}" == "1" ]]; then
+    VAL_DIR="$(ls -dt "$RESULTS"/validate_* 2>/dev/null | head -1 || true)"
+    if [[ -n "$VAL_DIR" && -f "$VAL_DIR/fit_report.md" ]]; then
+        cat "$VAL_DIR/fit_report.md"
+    else
+        echo "WARN: no fit_report.md found under $RESULTS/validate_*"
+    fi
+elif [[ -f "$RUN_DIR/cells.json" ]]; then
     python3 /bench/container/report.py --cells "$RUN_DIR/cells.json" \
         --out "$RUN_DIR" || echo "WARN: report.py failed (cells.json present)"
 else
@@ -63,5 +84,5 @@ if [[ "${HOST_UID:-0}" != "0" ]]; then
     chown -R "${HOST_UID}:${HOST_GID:-${HOST_UID}}" "$HF_HOME" 2>/dev/null || true
 fi
 
-echo "=== entrypoint done (run_matrix rc=$MATRIX_RC) → $RUN_DIR ==="
+echo "=== entrypoint done (rc=$MATRIX_RC) → $RUN_DIR ==="
 exit "$MATRIX_RC"

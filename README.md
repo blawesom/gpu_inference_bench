@@ -63,12 +63,42 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
 ./bench.sh --results /tmp/out                # output root
 ./bench.sh --keep-weights                   # don't delete weights per model
 ./bench.sh --start-timeout 1200             # server health-wait budget (s)
+./bench.sh --validate --models M3,M4        # preflight VRAM-fit check (static+live probe)
 ./bench.sh --dry-run                        # print the docker command, stop
 ./bench.sh --force                          # skip disk-space gates
 ```
 
 Environment overrides: `VLLM_VERSION`, `GPU_VENDOR`, `HF_CACHE_HOST`,
 `RESULTS_DIR`, `SERVER_START_TIMEOUT`.
+
+## Preflight validation (`--validate`)
+
+`--validate` runs `container/validate_fit.py` instead of the benchmark matrix.
+For each (model, config) cell it does two things:
+
+1. **Static estimate** — no GPU required. Fetches `config.json` + weight-file
+   sizes from HuggingFace and computes weight bytes, per-token KV cost
+   (hybrid GDN aware: only the 1/4 full-attention layers carry a KV cache,
+   the rest use a fixed-size linear-attention state), workload KV demand at
+   C=16, and an overhead budget (CUDA graph + profiling + runtime). Verdict:
+   **FIT / TIGHT / NO-FIT**. The overhead is auto-calibrated from the
+   measured `mem_peak_gb` of the most recent local `report.json` if present,
+   otherwise defaults to 6 GiB.
+2. **Live probe** (when a GPU is available) — boots the exact `vllm serve`
+   command for the cell, waits for `/health` or a startup failure, then parses
+   vLLM's own sizing lines (`Model loading took`, `Estimated CUDA graph
+   memory`, `Available KV cache memory`, `GPU KV cache size`) for the
+   **definitive** verdict, including the exact error line on OOM/unsupported.
+
+Output: `results/validate_<ts>_<gpu>/{fit_report.json,fit_report.md,
+probe_<model>_<config>.log}`. The validator never runs the concurrency sweep
+and leaves weights in the HF cache (the real run reuses them).
+
+> **Why:** vLLM v0.28.0 counts CUDA-graph memory against
+> `--gpu-memory-utilization`, so a checkpoint that "fits" on paper can still
+> fail with `No available memory for the cache blocks`. `--validate` catches
+> this before committing to a ~4 h matrix run — essential for the tight cells
+> (M3 27 B dense, M4 35 B MoE on a 32 GB card).
 
 ## Outputs
 
@@ -115,15 +145,31 @@ what makes cross-machine results comparable:
 |-----|-----------------|------------------------------------|-------------|---------|
 | M1  | dense ~9 B      | `Qwen/Qwen3.5-9B`                  | BF16        | 19.3 GB |
 | M2  | MoE small       | `openai/gpt-oss-20b`               | MXFP4 native| 13.8 GB |
-| M3  | dense 27 B      | `cyankiwi/Qwen3.8-27B-AWQ-INT4`    | AWQ 4-bit   | 21.0 GB |
-| M4  | MoE 35 B / 3 B active | `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` | GPTQ 4-bit | 24.4 GB |
+| M3  | dense 27 B      | `cyankiwi/Qwen3.8-27B-AWQ-INT4`    | 4-bit CT    | 21.0 GB |
+| M4  | MoE 35 B / 3 B active | `cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit` | 4-bit CT  | 24.5 GB |
+
+> **M4 checkpoint note:** the original `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` is
+> not supported by the vLLM ROCm backend (the server fails to load the
+> GPTQ attention/expert weights). The same base model in AWQ-4-bit
+> (compressed-tensors, the quant family M3 already uses on ROCm) is the
+> cross-vendor default; the GPTQ id remains in `config/models.yaml` as a
+> commented NVIDIA-only alternative.
+>
+> **M3/M4 32 GB fit:** both are model-sized near the top of the 32 GB
+> budget, so they carry model-level overrides in `config/models.yaml` —
+> `gpu_memory_utilization: 0.95`, `max_model_len: 2048` (workload needs
+> 512+256=768), and `--max-num-batched-tokens 2048` — because vLLM v0.28.0
+> counts CUDA-graph memory against the utilization budget. Run `--validate`
+> first; M4 is the tightest cell.
 
 Per-model optimization configs (one server process each):
 
 | Model | Configs |
 |-------|---------|
-| M1, M3 (dense)  | `baseline` · `kv-fp8` (`--kv-cache-dtype fp8`) · `long-context` (32 k context) |
-| M2, M4 (MoE)    | `baseline` · `kv-fp8` |
+| M1 (dense 9 B) | `baseline` · `kv-fp8` (`--kv-cache-dtype fp8`) · `long-context` (32 k) |
+| M2 (MoE)       | `baseline` · `kv-fp8` |
+| M3 (dense 27 B)| `baseline` · `kv-fp8` (long-context removed: 32 k ctx can't fit on 32 GB) |
+| M4 (MoE 35 B)  | `baseline` · `kv-fp8` |
 
 **Auto-skip:** if a backend rejects a config (e.g. FP8 KV cache unsupported
 on some vendor/stack combos), the server fails to start, the orchestrator
@@ -146,9 +192,9 @@ re-running a single model without re-downloading).
 | `could not detect GPU vendor` | Install the vendor stack (`nvidia-container-toolkit` / AMD KFD / Intel XPU), or pass `--vendor` |
 | `no NVIDIA GPU found` | Check `nvidia-smi -L`; pass `--gpu-index` to pick a card |
 | disk gate aborts | Free space, `--cache-dir <bigger volume>`, or `--force` |
-| cell `skipped:oom` | Model + KV too large for the card at 0.90 GPU util; try a smaller model or fewer concurrency levels |
+| cell `skipped:oom` | Model + graph + profiling exceed the util budget (vLLM v0.28 counts CUDA-graph memory); run `--validate` to see the exact shortfall, raise the model's `gpu_memory_utilization`, lower `max_model_len` / `max-num-batched-tokens`, or add `enforce-eager` as a last resort |
 | cell `skipped:kv-fp8-unsupported` | Expected on backends without FP8 KV in v0.28.0; not a failure |
-| cell `skipped:unsupported:<…>` | Read the reason token, then `server_<model>_<config>.log` |
+| cell `skipped:unsupported:<…>` | Backend rejected the model/quant format (e.g. **GPTQ on ROCm** — see `server_<model>_<config>.log` for the exact weight line). M4 defaults to the AWQ variant for this reason; `--validate` surfaces the exact error |
 | model download fails | Gated repo → set `HF_TOKEN`; network → check HF access |
 | server never healthy | `server_<model>_<config>.log` in the run dir; raise `--start-timeout` for big first loads |
 | stale container from a crash | `docker rm -f gpu-bench` (bench.sh also does this on start) |

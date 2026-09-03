@@ -146,13 +146,26 @@ Selection rationale (latest generation, Sept 2026):
   FP8 (27.8 GB) leaves **no** KV room on 32 GB → use the 4-bit AWQ:
   default `cyankiwi/Qwen3.8-27B-AWQ-INT4` (21.0 GB, 1.08 M dl). (AMD's
   `amd/Qwen3.8-27B-Quark-AWQ-INT4-W4A16`, 19.5 GB, available via `--model`.)
-- **M4:** `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` (official, cross-vendor GPTQ 4-bit
-  supported on CUDA + ROCm + XPU). The newer NVIDIA Nemotron-3.5 30B-A3B is
-  NVFP4 — an NVIDIA-specific format that would auto-skip on ROCm/XPU and break
-  cross-vendor comparability → excluded from the default, available via `--model`
-  for NVIDIA-only runs.
-  Heaviest cell (24.4 GB): C=16 KV (~2.3 GB at 512+256, bf16 KV) fits on 32 GB
-  (~4.4 GB headroom); `kv-fp8` halves the KV need.
+  **Hybrid GDN architecture:** every 4th layer uses full attention (KV cache);
+  the remaining 3/4 use linear attention (fixed-size recurrent state per
+  layer). This reduces KV footprint to ~1/4 of a dense model.
+  On 32 GB at 0.90 util this OOMs at startup (vLLM v0.28 counts CUDA-graph
+  memory against the util budget): `Available KV cache memory: -X GiB`.
+  Fit flags: 0.95 util + 2048 max_model_len + 2048 max-num-batched-tokens.
+  `long-context` (32k) is dropped: a 21 GB model cannot hold 32k context on
+  32 GB, even at fp8 KV.
+  M3 baseline at 0.95 util: pool ~3.3 GiB ≈ 36k tokens — enough for C=16
+  workload (12.3k tokens) + GDN state (1.2 GB @ C=16).
+- **M4:** `Qwen/Qwen3.5-35B-A3B` (35.95 B / 3 B active). **Cross-vendor
+  checkpoint: AWQ-4-bit** `cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit` (24.5 GB) —
+  the original official GPTQ-Int4 (`Qwen/Qwen3.5-35B-A3B-GPTQ-Int4`) is NOT
+  supported by the vLLM ROCm backend (verified on the 2026-09-02 ROCm 7.2.3
+  run: both M4 cells `skipped:unsupported:<…>`; the server rejects the GPTQ
+  attention/expert weights at load time). The AWQ variant is the same
+  compressed-tensors pack-quantized int4 family M3 uses on ROCm, so it keeps
+  cross-vendor comparability. The GPTQ id is retained (commented) for
+  NVIDIA-only runs. Heaviest cell (24.5 GB): needs the 0.95 util / 2048-ctx /
+  2048-batch fit flags; `--validate` first.
 - **Execution model: each run targets one machine** (a different GPU per test).
   The report is therefore a **standalone per-machine deliverable**: it must be
   self-contained (full environment block, image digest, vLLM version) and no
@@ -448,7 +461,9 @@ Container `entrypoint.sh` → `run_matrix.py` implements the §6 loop with:
 
 ## 11. Open Decisions
 
-**Resolved:** M3 = cyankiwi AWQ · M4 = Qwen 35B-A3B GPTQ-Int4 (cross-vendor) ·
+**Resolved:** M3 = cyankiwi AWQ · **M4 = cyankiwi Qwen3.5-35B-A3B AWQ-4bit**
+(GPTQ-Int4 not supported on ROCm — verified 2026-09-02; GPTQ id kept as
+NVIDIA-only comment) ·
 VRAM floor 32 GB (32–40 GB fleet) · **full matrix is the default (~4 h)** ·
 **weights deleted after each model** (`--keep-weights` to disable) ·
 power metrics **best-effort** (null when the vendor tool lacks them) ·
@@ -456,7 +471,10 @@ per-machine standalone reports (no cross-run diff mode) ·
 **MTP dropped** — not supported for any matrix model in v0.28.0 (spike); the
 two MoE models run **`baseline · kv-fp8` only** (no speculative decoding — `ngram`
 was benchmarked in the spike but is not a meaningful perf axis on the random
-workload).
+workload) · **M3 `long-context` dropped** (32 k ctx can't fit a 21 GB model on
+32 GB; M1 keeps it) · **`--validate` preflight** (static estimate + live
+probe; `container/validate_fit.py`) catches startup OOM / unsupported-quant
+before a full ~4 h run.
 
 **No other open items — ready to implement.**
 
@@ -475,7 +493,8 @@ workload).
 | 7 | Smoke test: `--quick` on NVIDIA (this env or user's box) | pending — needs a live GPU box (this repo was built on a GPU-less host) |
 | 8 | Full matrix run, NVIDIA | pending — needs a live GPU box |
 | 9 | Port checks: AMD, Intel (XPU FP8-KV/MTP auto-skip paths exercised) | pending — needs live AMD/Intel boxes |
-| 10 | README + usage examples | **done** — requirements, full flag reference, output layout, metrics/workload, storage behavior, troubleshooting, known limitations |
+| 10 | README + usage examples | **done** |
+| 11 | Live ROCm validation & M3/M4 fix | **done** — see report below; M3 fit flags, M4 AWQ swap, `--validate` preflight |
 
 ---
 
@@ -490,3 +509,5 @@ workload).
 *v3.5 — 2026-09-02 (milestones 3–6 built & mock-tested end-to-end: `config/models.yaml`, `container/run_matrix.py` (in-container GPU select, server lifecycle, C-sweep, weight delete, `cells.json`), `container/telemetry.py` (1 Hz AMD/NVIDIA/Intel), `container/report.py` (real-key mapping, JSON+MD), `container/entrypoint.sh`, `bench.sh` (vendor detect, image+GPU args, disk gates, stale cleanup, `--dry-run`). Full 4-model mock matrix: 10 cells → 20 rows, clean. Next: milestone 7 (real `--quick` smoke on a live GPU).)*
 *
 *v3.6 — 2026-09-02 (implementation finished for the GPU-less build host: per-run output dirs `results/<ts>_<gpu-slug>/` + `.latest`; `environment.json` (GPU/driver/stack/OS/kernel/CPU/RAM/docker/image-id/vLLM) written in-container, best-effort; `cells.json` is now a self-contained manifest (workload/models/cells); `report.json` schema v1.0 (run_id, environment, workload, models, metadata, flat rows); `report.md` env block + per-model tables; `bench.sh` gains `--image`/`--cache-dir`, passes host OS/docker-version/image-id to the container. Milestone 10 done (README). Milestones 7–9 remain: they require live GPU hardware.)*
+*
+*v3.7 — 2026-09-03 (live ROCm 7.2.3 validation, 32 GB card 0x7551, run 20260902-220721. **M3** `skipped:oom` root cause: vLLM v0.28.0 counts CUDA-graph memory against `--gpu-memory-utilization` (default since v0.21.0), so 21 GB weights + ~4.5–7 GB graph/profiling at 8192 ctx exceeds the 0.90×31.9 GB=28.7 GB budget → `Available KV cache memory: −X GiB` → `No available memory for the cache blocks`. Fix: model-level `gpu_memory_utilization 0.95` + `max_model_len 2048` (workload needs 768) + `max-num-batched-tokens 2048`; `long-context` dropped (32 k ctx cannot fit on 32 GB). **M4** `skipped:unsupported:<…>` root cause: GPTQ-Int4 is not supported by the vLLM ROCm backend (server rejects GPTQ attention/expert weights at load). Fix: M4 → `cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit` (same compressed-tensors int4 family as M3; GPTQ id kept as NVIDIA-only comment). New **`--validate` preflight** (`container/validate_fit.py`): static HF-based estimate (hybrid-GDN KV aware) + live server probe that parses vLLM's own sizing lines for a definitive FIT/TIGHT/NO-FIT/UNSUPPORTED verdict; overhead auto-calibrated from the previous run's telemetry. `run_matrix.build_server_cmd` gains model-level `flags` + `gpu_memory_utilization` override (common < model < config). `gpu_name()` strips rocm-smi's raw `Card Model:` prefix. Milestone 11 done.)*

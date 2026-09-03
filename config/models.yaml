@@ -72,16 +72,44 @@ models:
   M3:
     id: cyankiwi/Qwen3.8-27B-AWQ-INT4
     class: dense-27b
+    # format is compressed-tensors pack-quantized int4 (AWQ-style observer).
     format: awq4
     weights_gb: 21.0
-    max_model_len: 8192
-    configs: [baseline, kv-fp8, long-context]
+    # 32 GB fit (heaviest dense model). The workload needs only 512+256=768
+    # tokens, so the 8192 default context wastes CUDA-graph + profiling + KV
+    # budget and OOMs at the common 0.90 utilization. These model-level
+    # overrides claw back headroom: 0.95 util (+~1.6 GB), 2048 context, and a
+    # capped prefill/profiling batch. long-context (32k) is removed — a
+    # 21 GB model cannot hold 32k context on 32 GB.
+    gpu_memory_utilization: 0.95
+    max_model_len: 2048
+    flags:
+      max-num-batched-tokens: 2048
+    configs: [baseline, kv-fp8]
 
   M4:
-    id: Qwen/Qwen3.5-35B-A3B-GPTQ-Int4
+    # GPTQ-Int4 (Qwen/Qwen3.5-35B-A3B-GPTQ-Int4) is NOT supported by the
+    # vLLM ROCm backend — the server fails to start ("not supported" while
+    # loading attention/expert weights) on both baseline and kv-fp8. The
+    # same base model in AWQ-Int4 (compressed-tensors, same quant family as
+    # M3) loads on ROCm, so it is the default here. On NVIDIA, re-enable the
+    # GPTQ id below to keep the official cross-vendor checkpoint.
+    id: cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit
+    # id: Qwen/Qwen3.5-35B-A3B-GPTQ-Int4   # NVIDIA-only (GPTQ unsupported on ROCm)
     class: moe-35b-a3b
-    format: gptq4
-    weights_gb: 24.4
-    max_model_len: 8192
+    format: awq4
+    weights_gb: 24.5
+    # 32 GB fit (largest weights in the matrix). Same levers as M3: 0.95
+    # util, 2048 context, capped batch. 24.5 GB leaves little room, so this
+    # is the tightest cell — run ./bench.sh --validate first.
+    gpu_memory_utilization: 0.95
+    max_model_len: 2048
+    flags:
+      max-num-batched-tokens: 2048
     # No speculative decoding (no MTP head in config; ngram not meaningful).
+    # Escape hatch if the probe OOMs: add `enforce-eager: true` below —
+    # skips CUDA-graph capture entirely (saves the ~3–5 GiB graph estimate)
+    # at a decode-perf cost. 35 B on a 32 GB card is the tightest cell in
+    # the matrix; if it still does not fit, the honest answer is "M4 needs
+    # a 40+ GB card" and it should be dropped from the 32 GB fleet.
     configs: [baseline, kv-fp8]

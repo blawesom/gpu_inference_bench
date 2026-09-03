@@ -102,7 +102,12 @@ def gpu_name(vendor: str, idx: int | None = None) -> str:
                     # error (e.g. "get_name, Error when calling libdrm")
                     # or N/A, keep the first non-error field as fallback
                     if "Error" not in name and "N/A" not in name:
-                        return name
+                        # strip "Card Model:" prefix + padding (some rocm-smi
+                        # versions emit the raw field name when the product DB
+                        # lacks this device ID, e.g. "Card Model:  0x7551")
+                        name = re.sub(
+                            r"^\s*(?:Card\s+Model\s*:\s*)", "", name).strip()
+                        return name or f"amd-gpu"
         return f"amd-gpu"
     if vendor == "intel":
         out = _run_cmd(["xpu-smi", "discovery"], timeout=30.0)
@@ -296,11 +301,25 @@ def parse_args() -> argparse.Namespace:
 def build_server_cmd(model: dict, cfg: dict, common: dict) -> list[str]:
     """Assemble the `vllm serve ...` argv for one (model, config) cell.
 
-    Precedence: common < model < config (e.g. long-context overrides
-    max-model-len).
+    Precedence: common < model < config.
+
+    Model-level ``flags:`` dict (new) — merged after common, before config flags.
+    Model-level ``gpu_memory_utilization:`` — overrides the common setting.
+    ``max-model-len`` — model defaults to config; long-context can override.
     """
-    max_len = str(model["max_model_len"])
+    max_len = str(model.get("max_model_len", common.get("max-model-len", 8192)))
+    gpu_util = str(model.get("gpu_memory_utilization",
+                            common.get("gpu_memory_utilization", 0.90)))
     extra: list[str] = []
+    # model-level flags (applied between common and config flags)
+    for flag, val in (model.get("flags") or {}).items():
+        if flag == "max-model-len":
+            max_len = "true" if val is True else str(val)
+        elif val is True:
+            extra.append(f"--{flag}")
+        else:
+            extra.extend([f"--{flag}", str(val)])
+    # config flags (override model + common)
     for flag, val in (cfg.get("flags") or {}).items():
         if flag == "max-model-len":
             max_len = "true" if val is True else str(val)
@@ -313,7 +332,7 @@ def build_server_cmd(model: dict, cfg: dict, common: dict) -> list[str]:
            "--host", str(common.get("host", "0.0.0.0")),
            "--port", str(common.get("port", 8000)),
            "--max-model-len", max_len,
-           "--gpu-memory-utilization", str(common.get("gpu_memory_utilization", 0.90))]
+           "--gpu-memory-utilization", gpu_util]
     if common.get("trust_remote_code", True):
         cmd.append("--trust-remote-code")
     return cmd + extra

@@ -13,6 +13,7 @@
 #   ./bench.sh --vendor amd             # override vendor detection
 #   ./bench.sh --image <repo:tag>       # override the vLLM image
 #   ./bench.sh --cache-dir /big/hf      # HF weights cache directory
+#   ./bench.sh --validate               # preflight VRAM-fit check (static+live)
 #   ./bench.sh --dry-run                # print the docker command, don't run
 #   ./bench.sh --force                  # skip the disk-space gate
 #
@@ -55,6 +56,7 @@ CONFIGS=""
 CONCURRENCY=""
 QUICK=0
 KEEP_WEIGHTS=0
+VALIDATE=0
 START_TIMEOUT="${SERVER_START_TIMEOUT:-900}"
 DRY_RUN=0
 FORCE=0
@@ -72,6 +74,7 @@ while [[ $# -gt 0 ]]; do
         --concurrency)   CONCURRENCY="${2:-}"; shift 2 ;;
         --concurrency=*) CONCURRENCY="${1#*=}"; shift ;;
         --quick)         QUICK=1; shift ;;
+        --validate)      VALIDATE=1; shift ;;
         --keep-weights)  KEEP_WEIGHTS=1; shift ;;
         --start-timeout) START_TIMEOUT="${2:-900}"; shift 2 ;;
         --start-timeout=*) START_TIMEOUT="${1#*=}"; shift ;;
@@ -270,6 +273,7 @@ DOCKER_CMD=(docker run --rm --name "$CONTAINER_NAME" --entrypoint bash
     -e CONFIGS="${CONFIGS:-}"
     -e CONCURRENCY="${CONCURRENCY:-}"
     -e QUICK="$QUICK"
+    -e VALIDATE="$VALIDATE"
     -e KEEP_WEIGHTS="$KEEP_WEIGHTS"
     -e HF_HOME=/hf-cache
     -e RESULTS=/results
@@ -304,6 +308,19 @@ log "results → $RESULTS_DIR"
 RC=$?
 echo
 log "container exited rc=$RC"
+if [[ "$VALIDATE" == "1" ]]; then
+    # Validate mode: fit_report lives in validate_<ts>_<gpu>/ under results.
+    VAL_DIR="$(ls -dt "$RESULTS_DIR"/validate_* 2>/dev/null | head -1 || true)"
+    if [[ -n "$VAL_DIR" && -f "$VAL_DIR/fit_report.md" ]]; then
+        log "fit report: $VAL_DIR/fit_report.md"
+        echo "───────────────────────────────────────────────────────────────"
+        cat "$VAL_DIR/fit_report.md"
+        echo "───────────────────────────────────────────────────────────────"
+    else
+        log "fit report: not found (validate dir not written to $RESULTS_DIR)"
+    fi
+    exit "$RC"
+fi
 # Locate this run's dir (container writes the run-id basename to
 # $RESULTS_DIR/.latest; fall back to legacy top-level report.md).
 LATEST="$(cat "$RESULTS_DIR/.latest" 2>/dev/null || true)"
