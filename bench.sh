@@ -45,7 +45,50 @@ NEED_DOCKER_GB=35
 NEED_DOCKER_PRESENT_GB=15
 
 usage() {
-    grep '^#   \./bench.sh' "$0" | sed 's/^#   //'
+    cat <<'EOF'
+Usage: ./bench.sh [OPTIONS]
+
+Host-side orchestrator for the platform-agnostic GPU inference benchmark.
+Detects the GPU vendor, pulls the pinned vLLM image, and launches the
+container that runs the full model × config matrix.
+
+OPTIONS:
+  --quick                 Smoke test: M1 only, baseline+kv-fp8, C=1,8
+  --models <csv>          Subset of models, comma list (e.g. M2,M4). Default: all
+  --configs <csv>         Subset of configs, comma list (e.g. baseline,kv-fp8)
+  --concurrency <csv>     Concurrency sweep, comma list (e.g. 1,8,16). Default: 1,4,8,16
+  --gpu-index <N>         Force a specific physical GPU index (auto-pick by VRAM)
+  --vendor <amd|nvidia|intel>   Override GPU vendor auto-detection
+  --version <tag>         Override the vLLM version (default v0.28.0)
+  --image <repo:tag>      Override the full vLLM image name
+  --cache-dir <dir>       HF weights cache directory (default ./.hf-cache)
+  --results <dir>         Output root (default ./results)
+  --start-timeout <sec>   Server health-wait budget (default 900)
+  --validate              Preflight VRAM-fit check (static estimate + live probe)
+  --clean [M1,M2,...]     Remove cached model weights, then exit (no container)
+  --delete-weights        Delete weights after each model (old behavior; off by default
+                          so re-runs skip the ~20-25 GB re-download)
+  --keep-weights          Deprecated no-op (weights are kept by default now)
+  --dry-run               Print the docker command, don't run
+  --force                 Skip the disk-space gates
+  -h, --help              Show this help and exit
+
+ENVIRONMENT OVERRIDES:
+  VLLM_VERSION        vLLM version tag (default v0.28.0)
+  GPU_VENDOR          amd | nvidia | intel (auto-detected if unset)
+  GPU_INDEX           physical GPU index (same as --gpu-index)
+  HF_CACHE_HOST       HF weights cache directory (same as --cache-dir)
+  RESULTS_DIR         output root (same as --results)
+  SERVER_START_TIMEOUT  server health-wait budget in seconds (default 900)
+
+EXAMPLES:
+  ./bench.sh                          # full matrix, auto-detect GPU
+  ./bench.sh --quick                  # smoke test (M1, ~5 min)
+  ./bench.sh --models M2,M4           # subset of models
+  ./bench.sh --validate --models M3,M4  # preflight VRAM-fit check
+  ./bench.sh --clean M3,M4            # free M3+M4 weights, then exit
+  ./bench.sh --dry-run                # print the docker command, don't run
+EOF
     exit 0
 }
 

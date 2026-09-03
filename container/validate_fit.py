@@ -448,12 +448,17 @@ def probe_cell(model: dict, cfg: dict, workload: dict, common: dict,
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Validate model VRAM fit on target GPU")
-    p.add_argument("--config", default="/bench/config/models.yaml")
-    p.add_argument("--results", default="/results")
-    p.add_argument("--vendor", default=os.environ.get("GPU_VENDOR", "auto"))
-    p.add_argument("--gpu-index", type=int, default=None)
+    p.add_argument("--config", default="/bench/config/models.yaml",
+                    help="path to models.yaml config")
+    p.add_argument("--results", default="/results",
+                    help="output root directory")
+    p.add_argument("--vendor", default=os.environ.get("GPU_VENDOR", "auto"),
+                    help="amd | nvidia | intel | auto (default)")
+    p.add_argument("--gpu-index", type=int, default=None,
+                    help="physical GPU index (overrides auto-pick by VRAM)")
     p.add_argument("--models", default=None, help="comma list, e.g. M3,M4")
-    p.add_argument("--start-timeout", type=int, default=DEFAULT_START_TIMEOUT)
+    p.add_argument("--start-timeout", type=int, default=DEFAULT_START_TIMEOUT,
+                    help="server health-wait budget in seconds")
     p.add_argument("--overhead-gib", type=float, default=None,
                     help="override overhead estimate (GiB); default: auto-calibrate from past run or 6.0")
     p.add_argument("--vram-gb", type=float, default=None,

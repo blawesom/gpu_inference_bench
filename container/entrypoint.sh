@@ -22,6 +22,49 @@
 #   HOST_UID / HOST_GID   for chown (skipped when uid 0)
 set -uo pipefail
 
+usage() {
+    cat <<'EOF'
+Usage: bash entrypoint.sh [OPTIONS]
+
+In-container bootstrap for the GPU inference benchmark.  Called by bench.sh
+via docker run --entrypoint bash.  All configuration is via environment
+variables (set by bench.sh), not CLI flags.
+
+ENVIRONMENT (required):
+  GPU_VENDOR          amd | nvidia | intel    (required)
+  RESULTS             output directory         (default /results)
+
+ENVIRONMENT (optional):
+  GPU_INDEX           physical GPU index override
+  MODELS              comma list, e.g. M1,M2  (default: all)
+  CONFIGS             comma list, e.g. baseline
+  CONCURRENCY         comma list, e.g. 1,8,16
+  QUICK               1 → M1 only, baseline+kv-fp8, C=1,8
+  VALIDATE            1 → run VRAM-fit validator instead of the matrix
+  KEEP_WEIGHTS        deprecated no-op (weights kept by default)
+  DELETE_WEIGHTS      1 → delete weights per model (old behavior)
+  HF_HOME             HF cache dir              (default /hf-cache)
+  HOST_UID/HOST_GID   for chown of output dirs (skipped when uid 0)
+  SERVER_START_TIMEOUT  server health-wait budget (seconds)
+
+OPTIONS:
+  -h, --help          Show this help and exit
+
+This script assembles the CLI and runs run_matrix.py (or validate_fit.py
+when VALIDATE=1), then restores host ownership of the output dirs.
+EOF
+    exit 0
+}
+
+# Handle -h/--help before anything else
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage ;;
+    esac
+done
+
+set -uo pipefail
+
 RESULTS="${RESULTS:-/results}"
 export HF_HOME="${HF_HOME:-/hf-cache}"
 

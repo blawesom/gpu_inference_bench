@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
-# clean.sh — standalone script to remove cached model weights from the HF cache.
+# clean.sh — standalone host script to remove cached model weights from the HF cache.
 #
-# Usage:
-#   ./clean.sh                    # remove ALL cached weights from default cache
-#   ./clean.sh M1,M2,M3,M4        # remove specific models (keys from config/models.yaml)
-#   ./clean.sh "Qwen/Qwen3.5-9B"  # remove by HuggingFace repo ID (direct)
-#
-# Options:
-#   --cache-dir <dir>   override HF cache location (default: .hf-cache in repo root)
-#   --dry-run           show what would be removed, do not delete
-#   --free              print total disk freed after deletion
+# Weights are kept in the cache by default after each benchmark run so re-runs
+# skip the ~20-25 GB re-download.  Use this script to free that disk space.
 #
 # The HF cache structure is:
 #   <cache_dir>/hub/models--<org>--<name>/
 #
-# Weights are downloaded by vllm/snapshot_download and cached here. Removing
-# them does NOT affect the vLLM Docker image, only cached checkpoints.
+# Model keys (from config/models.yaml): M1 M2 M3 M4
+#   M1 → Qwen/Qwen3.5-9B
+#   M2 → openai/gpt-oss-20b
+#   M3 → cyankiwi/Qwen3.8-27B-AWQ-INT4
+#   M4 → cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit
 #
-# Example: speed up re-runs by keeping weights (default), then clean when done
-#   ./bench.sh --models M3,M4   # runs and caches M3+M4 weights
-#   ./clean.sh M3,M4            # frees ~45 GB
+# Usage:
+#   ./clean.sh                        # remove ALL cached weights (~80 GB)
+#   ./clean.sh M3,M4                  # free only M3 + M4 (~45 GB)
+#   ./clean.sh "Qwen/Qwen3.5-9B"      # remove by HuggingFace repo ID
+#   ./clean.sh --dry-run              # preview without deleting
 
 set -euo pipefail
 
@@ -30,6 +28,45 @@ DRY_RUN=0
 SHOW_FREE=0
 MODELS_RAW=""
 
+usage() {
+    cat <<'EOF'
+Usage: ./clean.sh [OPTIONS] [MODELS]
+
+Standalone host script to remove cached model weights from the HF cache.
+Weights are kept by default after each benchmark run so re-runs skip the
+re-download; use this to free that disk space.
+
+POSITIONAL:
+  MODELS                Model keys (M1,M2,M3,M4) or HuggingFace repo IDs
+                        (comma-separated). Default: all cached weights.
+
+OPTIONS:
+  --cache-dir <dir>     Override HF cache location (default ./.hf-cache)
+  --models <csv>        Comma-separated model keys or repo IDs
+                        (same as positional args)
+  --dry-run             Show what would be removed without deleting
+  --free                Print total disk freed after deletion
+  -h, --help            Show this help and exit
+
+EXAMPLES:
+  ./clean.sh                        # remove all cached weights (~80 GB)
+  ./clean.sh M3,M4                  # free only M3 + M4 (~45 GB)
+  ./clean.sh "Qwen/Qwen3.5-9B"      # remove by full HuggingFace repo ID
+  ./clean.sh --dry-run              # preview without deleting
+  ./clean.sh --free                 # show total freed disk
+
+MODEL KEYS (from config/models.yaml):
+  M1 → Qwen/Qwen3.5-9B
+  M2 → openai/gpt-oss-20b
+  M3 → cyankiwi/Qwen3.8-27B-AWQ-INT4
+  M4 → cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit
+
+HF CACHE STRUCTURE:
+  <cache_dir>/hub/models--<org>--<name>/
+EOF
+    exit 0
+}
+
 # ── arg parsing ──────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -38,13 +75,7 @@ while [[ $# -gt 0 ]]; do
         --models=*)   MODELS_RAW="${1#*=}"; shift ;;
         --dry-run)    DRY_RUN=1; shift ;;
         --free)       SHOW_FREE=1; shift ;;
-        -h|--help)
-            echo "$0"
-            grep '^#   \./clean.sh\|^#   \./clean\.sh\|^#   --' "$0" | sed 's/^#   //'
-            echo
-            echo "Model keys (from $CONFIG): M1 M2 M3 M4"
-            exit 0
-            ;;
+        -h|--help)    usage ;;
         *) MODELS_RAW="${MODELS_RAW:+${MODELS_RAW},}$1"; shift ;;
     esac
 done
@@ -58,8 +89,7 @@ fi
 log() { echo "[clean] $*"; }
 die() { echo "[clean] ERROR: $*" >&2; exit 1; }
 
-# Resolve a model key (M1, M2, ...) or repo ID to the HF repo ID and dir name.
-# Returns "repo_id dir_name" space-separated.
+# Resolve a model key (M1, M2, ...) or repo ID to the HF dir name.
 resolve_model() {
     local raw="$1"
 
@@ -67,13 +97,11 @@ resolve_model() {
     if [[ "$raw" == */* ]]; then
         local org="${raw%%/*}"
         local name="${raw#*/}"
-        echo "$raw models--${org//--/--}--${name//--/--}"
+        echo "models--${org//--/--}--${name//--/--}"
         return
     fi
 
     # Model key (M1, M2, M3, M4) — look up in models.yaml
-    # Simple grep: look for 'id: <repo>' under the matching model block
-    # Pattern: model key followed by id: line
     local repo_id
     repo_id=$(sed -n "/^  ${raw}:/,/^  [A-Z]/p" "$CONFIG" | grep '^\s*id:' | head -1 | sed 's/.*id:\s*//' | xargs)
     if [[ -z "$repo_id" ]]; then
@@ -81,9 +109,7 @@ resolve_model() {
     fi
     local org="${repo_id%%/*}"
     local name="${repo_id#*/}"
-    # Handle repo names with hyphens (replace -- in org with --)
-    local dir_name="models--${org//\//--}--${name//\//--}"
-    echo "$repo_id $dir_name"
+    echo "models--${org//\//--}--${name//\//--}"
 }
 
 # ── main ─────────────────────────────────────────────────────────────────────
@@ -91,9 +117,6 @@ resolve_model() {
 if [[ -z "$MODELS_RAW" ]]; then
     MODELS_RAW="all"
 fi
-
-# Collect positional args (bare repo IDs / keys) — comma or space separated.
-# They are appended to MODELS_RAW if any were given.
 
 # Determine the list of models to clean.
 declare -a MODEL_KEYS=()
@@ -119,9 +142,9 @@ for key in "${MODEL_KEYS[@]}"; do
             done
         fi
     else
-        read -r repo_id dir_name <<< "$(resolve_model "$key")"
+        read -r dir_name <<< "$(resolve_model "$key")"
         REPO_PAIRS+=("$dir_name")
-        log "$key → $repo_id (dir: $dir_name)"
+        log "$key → dir: $dir_name"
     fi
 done
 

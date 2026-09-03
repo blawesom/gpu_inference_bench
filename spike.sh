@@ -35,17 +35,53 @@ FORCE_GPU_IDX=""
 OUT_DIR="$(pwd)/spike-out"
 HF_CACHE="$(pwd)/spike-hf-cache"
 
+log() { echo "[spike] $*" >&2; }
+
+usage() {
+    cat <<'EOF'
+Usage: ./spike.sh [OPTIONS]
+
+vLLM v0.28.0 verification spike (milestone 2 of PLAN.md).
+Runs on ONE machine with a GPU (NVIDIA / AMD / Intel). Verifies:
+  S1  vLLM version + how to invoke the benchmark module
+      (`vllm bench serve` vs `python3 -m vllm.benchmark.serve`) +
+      flag availability (--save-result, --result-filename, --num-warmups,
+      --percentile-metrics, --ignore-eos, --max-concurrency)
+  S2  baseline: serve Qwen3.5-4B, one small bench run, capture the
+      result JSON schema
+  S3  `--kv-cache-dtype fp8`: does the server start? (error captured if not)
+  S4  speculative decoding on gpt-oss-20b with ngram (MTP is not
+      supported for GptOssForCausalLM in v0.28.0 — verified, not attempted)
+  S5  telemetry tools available in-container (nvidia-smi / rocm-smi /
+      intel_gpu_top) and whether a power field exists
+
+OPTIONS:
+  --skip-gpt-oss        Skip S4 (saves ~14 GB)
+  --image-tag <tag>     vLLM tag to verify (default v0.28.0)
+  --gpu-index <N>       Force the in-container HIP index (for AMD)
+  -h, --help            Show this help and exit
+
+ENV:
+  IMAGE_TAG             Override image tag (same as --image-tag)
+
+At launch it cleans previous-run state: orphaned spike container, model
+cache ($HF_CACHE/hub), and stale vllm spike images (current tag is kept
+to avoid a ~25 GB re-pull).
+
+Outputs: ./spike-out/  (step logs, bench JSON, summary.txt)
+EOF
+    exit 0
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-gpt-oss) SKIP_GPT_OSS=1; shift ;;
     --image-tag)    IMAGE_TAG="$2"; shift 2 ;;
     --gpu-index)    FORCE_GPU_IDX="$2"; shift 2 ;;
-    -h|--help)      sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help)      usage ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
-
-log() { echo "[spike] $*" >&2; }
 
 # ── vendor detection ─────────────────────────────────────────────────────────
 detect_vendor() {

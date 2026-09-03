@@ -314,9 +314,10 @@ def _write_json(report: dict, out_dir: Path) -> None:
 def main() -> None:
     import argparse
     p = argparse.ArgumentParser(
-        description="Build report from cells.json + bench results")
+        description="Build report.json + report.md from cells.json and the raw "
+                    "bench/telemetry JSON artifacts of one benchmark run.")
     p.add_argument("--cells", required=True, help="Path to cells.json")
-    p.add_argument("--out", default=".", help="Output directory")
+    p.add_argument("--out", default=".", help="Output directory (default: cells.json dir)")
     args = p.parse_args()
     cells_path = Path(args.cells)
     out_dir = Path(args.out)

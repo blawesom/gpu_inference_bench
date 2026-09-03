@@ -280,10 +280,19 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="GPU inference benchmark orchestrator")
-    p.add_argument("--config", default="/bench/config/models.yaml")
-    p.add_argument("--results", default="/results")
-    p.add_argument("--vendor", default=os.environ.get("GPU_VENDOR", "auto"))
+    p = argparse.ArgumentParser(
+        description="GPU inference benchmark orchestrator (runs inside the vLLM "
+                    "container). For each (model, config) cell: start the server, "
+                    "wait for /health, run the concurrency sweep with 1 Hz GPU "
+                    "telemetry, then kill the server. Weights are kept in the HF "
+                    "cache by default so re-runs skip the re-download.")
+    p.add_argument("--config", default="/bench/config/models.yaml",
+                   help="path to models.yaml")
+    p.add_argument("--results", default="/results",
+                   help="output root dir (a per-run subdir is created inside)")
+    p.add_argument("--vendor", default=os.environ.get("GPU_VENDOR", "auto"),
+                   choices=["auto", "nvidia", "amd", "intel"],
+                   help="GPU vendor (auto-detects from telemetry CLIs)")
     p.add_argument("--gpu-index", type=int, default=None,
                    help="physical GPU index (overrides auto-pick by VRAM)")
     p.add_argument("--models", default=None, help="comma list, e.g. M1,M2")
@@ -299,7 +308,8 @@ def parse_args() -> argparse.Namespace:
                         "manual cleanup instead.")
     p.add_argument("--quick", action="store_true",
                    help="M1 only, baseline+kv-fp8, concurrency 1,8")
-    p.add_argument("--start-timeout", type=int, default=DEFAULT_START_TIMEOUT)
+    p.add_argument("--start-timeout", type=int, default=DEFAULT_START_TIMEOUT,
+                   help="server health-wait budget in seconds (default 900)")
     p.add_argument("--dry-run", action="store_true",
                    help="print planned server/bench commands, run nothing")
     return p.parse_args()
