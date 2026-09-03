@@ -375,10 +375,13 @@ def stop_server(proc: subprocess.Popen | None) -> None:
             pass
 
 
-def wait_health(port: int, timeout: float) -> bool:
+def wait_health(port: int, timeout: float,
+                proc: subprocess.Popen | None = None) -> bool:
     url = f"http://127.0.0.1:{port}{HEALTH_PATH}"
     deadline = time.time() + timeout
     while time.time() < deadline:
+        if proc is not None and proc.poll() is not None:
+            return False  # server already exited — don't poll a dead port
         try:
             with urlrequest.urlopen(url, timeout=5) as r:
                 if 200 <= r.status < 300:
@@ -407,7 +410,7 @@ def probe_cell(model: dict, cfg: dict, workload: dict, common: dict,
                 "probe_cmd": s_cmd, "log": server_log.name}
 
     server = start_server(s_cmd, server_log)
-    if not wait_health(port, start_timeout):
+    if not wait_health(port, start_timeout, proc=server):
         parsed = _parse_probe_log(server_log)
         stop_server(server)
         parsed["probe_cmd"] = s_cmd

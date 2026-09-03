@@ -407,10 +407,13 @@ def build_bench_cmd(model: dict, workload: dict, concurrency: int,
 
 
 # ── Server lifecycle ─────────────────────────────────────────────────────────
-def wait_health(port: int, timeout: float) -> bool:
+def wait_health(port: int, timeout: float,
+                proc: subprocess.Popen | None = None) -> bool:
     url = f"http://127.0.0.1:{port}{HEALTH_PATH}"
     deadline = time.time() + timeout
     while time.time() < deadline:
+        if proc is not None and proc.poll() is not None:
+            return False  # server already exited — don't poll a dead port
         try:
             with urlrequest.urlopen(url, timeout=5) as r:
                 if 200 <= r.status < 300:
@@ -533,7 +536,7 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
     server: subprocess.Popen | None = None
     try:
         server = start_server(s_cmd, server_log)
-        if not wait_health(port, start_timeout):
+        if not wait_health(port, start_timeout, proc=server):
             cell["status"], cell["reason"] = parse_skip_reason(server_log)
             print(f"[cell {tag}] server FAILED → {cell['status']}:{cell['reason']}")
             return cell
