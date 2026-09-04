@@ -72,6 +72,8 @@ OPTIONS:
   --keep-weights          Deprecated no-op (weights are kept by default now)
   --dry-run               Print the docker command, don't run
   --force                 Skip the disk-space gates
+  --env KEY=VAL           Extra env var(s) into the container (repeatable,
+                          e.g. --env PYTORCH_DEBUG=1 or an XPU debug flag)
   -h, --help              Show this help and exit
 
 ENVIRONMENT OVERRIDES:
@@ -109,6 +111,7 @@ START_TIMEOUT="${SERVER_START_TIMEOUT:-900}"
 DRY_RUN=0
 FORCE=0
 IMAGE_OVERRIDE=""
+EXTRA_ENVS=()   # --env KEY=VAL pass-through (repeatable)
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --vendor)        VENDOR="${2:-}"; shift 2 ;;
@@ -139,6 +142,8 @@ while [[ $# -gt 0 ]]; do
         --cache-dir=*)   HF_CACHE_HOST="${1#*=}"; shift ;;
         --dry-run)       DRY_RUN=1; shift ;;
         --force)         FORCE=1; shift ;;
+        --env)           EXTRA_ENVS+=("${2:-}"); shift 2 ;;
+        --env=*)         EXTRA_ENVS+=("${1#*=}"); shift ;;
         -h|--help)       usage ;;
         *) echo "Unknown arg: $1 (see --help)" >&2; exit 2 ;;
     esac
@@ -376,6 +381,8 @@ DOCKER_CMD=(docker run --rm --name "$CONTAINER_NAME" --entrypoint bash
     -e HOST_UID="$HOST_UID"
     -e HOST_GID="$HOST_GID"
     -e SERVER_START_TIMEOUT="$START_TIMEOUT"
+    # Pass-through env vars (--env KEY=VAL), e.g. XPU debugging flags.
+    $(for e in ${EXTRA_ENVS[@]+"${EXTRA_ENVS[@]}"}; do printf -- '-e %q ' "$e"; done)
     # The 32 GB matrix lives at the edge of VRAM: on tight cells (M3/M4) the
     # caching allocator fragments the reserved pool and the last ~1 GiB
     # (CUDA-graph capture / profiling activation) OOMs. Expandable segments
