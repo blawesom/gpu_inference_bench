@@ -288,10 +288,29 @@ UNSUPPORTED_PATTERNS = re.compile(
     r"no (?:handler|support) for|could not be used|is not available", re.I)
 
 
-def _log_tail(text: str, max_lines: int = 30) -> str:
+def _log_tail(text: str, max_lines: int = 40) -> str:
     """Return the last *max_lines* non-empty lines, stripped."""
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     return "\n".join(lines[-max_lines:])
+
+
+def _root_cause_line(text: str) -> str:
+    """The line that actually explains a vLLM v1 engine-core crash.
+
+    The APIServer traceback at the end of the log only says
+    'Engine core initialization failed. See root cause above' — the real
+    cause is earlier: a native sycl/Level-Zero message (native abort,
+    'Failed core proc(s): {}') or the EngineCore process's own ERROR.
+    """
+    lines = text.splitlines()
+    for pat in (r"what\(\):", r"terminate called after throwing",
+                r"sycl::[\w:]*(exception|error)|ZE_[A-Z_]+_ERROR",
+                r"\(EngineCore[^)]*\)\s*ERROR\b"):
+        m = [l.strip() for l in lines if re.search(pat, l, re.I)]
+        if m:
+            return m[-1][:240]
+    m = [l.strip() for l in lines if re.search(r"\bERROR\b", l)]
+    return m[0][:240] if m else ""
 
 
 def _parse_probe_log(log_path: Path) -> dict:
@@ -348,9 +367,12 @@ def _parse_probe_log(log_path: Path) -> dict:
                 result["error_line"] = line.strip()
                 break
 
-    # Always attach the last 30 non-empty lines — they hold the real error
+    # Always attach the last 40 non-empty lines — they hold the real error
     # when the server crashes (exit code != 0) or times out.
     result["log_tail"] = _log_tail(text)
+    # Root-cause line for the report's reason column (vLLM v1's APIServer
+    # traceback only says "See root cause above").
+    result["root_cause"] = _root_cause_line(text)
 
     return result
 
@@ -439,7 +461,7 @@ def probe_cell(model: dict, cfg: dict, workload: dict, common: dict,
         return {"verdict": {"OOM": "NO-FIT",
                             "CRASH": "CRASH"}.get(
                                parsed.get("status"), "UNSUPPORTED"),
-                "reason": parsed.get("status", "unknown"),
+                "reason": parsed.get("unsupported_context") or parsed.get("root_cause") or parsed.get("status", "unknown"),
                 "log_lines": parsed}
     parsed = _parse_probe_log(server_log)
     parsed["probe_cmd"] = s_cmd
@@ -693,7 +715,7 @@ def main() -> int:
         if r["verdict"] in ("NO-FIT", "UNSUPPORTED", "TIMEOUT", "CRASH"):
             tail = r.get("log_tail", "")
             if tail:
-                for tline in tail.split("\n")[-10:]:  # last 10 lines
+                for tline in tail.split("\n")[-25:]:  # last 25 lines
                     lines.append(f"| | | ↳ {tline[:160]} | | | | |")
     lines.append("")
     lines.append("## Verdict Legend")
