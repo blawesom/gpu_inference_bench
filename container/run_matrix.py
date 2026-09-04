@@ -317,7 +317,9 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
         visible in the container and it is device 0).
       * Intel: the physical Level Zero index of the selected device
         (auto-picked by VRAM so a dGPU wins over an iGPU); applied
-        via ONEAPI_DEVICE_SELECTOR=level_zero/<idx>.
+        via ONEAPI_DEVICE_SELECTOR=level_zero/<idx>:* (the trailing :*
+        subdevice component is required by the OneAPI runtime — an
+        incomplete selector aborts with "Incomplete selector!").
     """
     vendor = (vendor or "auto").lower()
     if vendor == "amd":
@@ -360,10 +362,10 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
                else max(range(len(devs)),
                         key=lambda i: devs[i].get("total_bytes") or 0))
         d = devs[idx]
-        os.environ["ONEAPI_DEVICE_SELECTOR"] = f"level_zero/{idx}"
+        os.environ["ONEAPI_DEVICE_SELECTOR"] = f"level_zero/{idx}:*"
         total_gb = (d.get("total_bytes") or 0) // (1024 ** 3)
         print(f"[gpu-select] Intel idx {idx} ({d.get('name') or 'XPU'}, "
-              f"{total_gb} GB) → ONEAPI_DEVICE_SELECTOR=level_zero/{idx}")
+              f"{total_gb} GB) → ONEAPI_DEVICE_SELECTOR=level_zero/{idx}:*")
         return idx
     raise SystemExit(f"ERROR: unsupported GPU_VENDOR {vendor!r} "
                      f"(expect amd|nvidia|intel)")
