@@ -288,6 +288,12 @@ UNSUPPORTED_PATTERNS = re.compile(
     r"no (?:handler|support) for|could not be used|is not available", re.I)
 
 
+def _log_tail(text: str, max_lines: int = 30) -> str:
+    """Return the last *max_lines* non-empty lines, stripped."""
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    return "\n".join(lines[-max_lines:])
+
+
 def _parse_probe_log(log_path: Path) -> dict:
     """Parse the decisive memory/fit lines from a vLLM server log."""
     try:
@@ -341,6 +347,10 @@ def _parse_probe_log(log_path: Path) -> dict:
             if re.search(r"ValueError|RuntimeError|ERROR", line):
                 result["error_line"] = line.strip()
                 break
+
+    # Always attach the last 30 non-empty lines — they hold the real error
+    # when the server crashes (exit code != 0) or times out.
+    result["log_tail"] = _log_tail(text)
 
     return result
 
@@ -412,13 +422,23 @@ def probe_cell(model: dict, cfg: dict, workload: dict, common: dict,
 
     server = start_server(s_cmd, server_log)
     if not wait_health(port, start_timeout, proc=server):
+        # Capture exit code BEFORE stop_server: if the process is still
+        # alive it is a true hang/TIMEOUT and stop_server would SIGTERM
+        # it (exit -15), masquerading as a crash.
+        exit_code = server.poll() if server is not None else None
         parsed = _parse_probe_log(server_log)
         stop_server(server)
         parsed["probe_cmd"] = s_cmd
         parsed["log"] = server_log.name
-        if parsed.get("status") == "OK":
+        if exit_code is not None and exit_code != 0:
+            # Server process died on its own — the log tail holds the error.
+            parsed["status"] = "CRASH"
+            parsed["crash_code"] = exit_code
+        elif parsed.get("status") == "OK":
             parsed["status"] = "TIMEOUT"
-        return {"verdict": "NO-FIT" if parsed.get("status") == "OOM" else "UNSUPPORTED",
+        return {"verdict": {"OOM": "NO-FIT",
+                            "CRASH": "CRASH"}.get(
+                               parsed.get("status"), "UNSUPPORTED"),
                 "reason": parsed.get("status", "unknown"),
                 "log_lines": parsed}
     parsed = _parse_probe_log(server_log)
@@ -600,8 +620,10 @@ def main() -> int:
                                    vendor, gpu_idx, run_dir,
                                    start_timeout=args.start_timeout)
                 est["probe"] = probe
+                # surface the log tail for report rendering
+                est["log_tail"] = (probe.get("log_lines") or {}).get("log_tail", "")
                 pverdict = probe.get("verdict")
-                if pverdict in ("NO-FIT", "UNSUPPORTED", "TIMEOUT"):
+                if pverdict in ("NO-FIT", "UNSUPPORTED", "TIMEOUT", "CRASH"):
                     est["verdict"] = pverdict
                     est["reason"] = probe.get("reason") or probe.get("status", "")
                     all_pass = False
@@ -616,7 +638,8 @@ def main() -> int:
                     print(f"probe → {pverdict} ({probe.get('reason', '')[:90]})")
 
             if not args.quiet:
-                verdict_color = {"FIT": "\033[92m", "TIGHT": "\033[93m", "NO-FIT": "\033[91m",
+                verdict_color = {"FIT": "\033[92m", "TIGHT": "\033[93m",
+                                 "NO-FIT": "\033[91m", "CRASH": "\033[91m", "TIMEOUT": "\033[94m",
                                  "UNSUPPORTED": "\033[91m"}.get(est["verdict"], "\033[0m")
                 print(f"  {verdict_color}[{est['verdict']}]\033[0m "
                       f"w={est['weights_gb']}GB "
@@ -665,17 +688,26 @@ def main() -> int:
                       f"| {r.get('pool_gib','?')} |")
         if r.get("reason"):
             lines.append(f"| | | ↳ {r['reason'][:140]} | | | | |")
+        # Show the crash/tail lines only for failing cells, so the real error
+        # (server crash / timeout) is never hidden. FIT/TIGHT skip it.
+        if r["verdict"] in ("NO-FIT", "UNSUPPORTED", "TIMEOUT", "CRASH"):
+            tail = r.get("log_tail", "")
+            if tail:
+                for tline in tail.split("\n")[-10:]:  # last 10 lines
+                    lines.append(f"| | | ↳ {tline[:160]} | | | | |")
     lines.append("")
     lines.append("## Verdict Legend")
     lines.append("- **FIT**: weights + graph + profiling leave enough KV pool for full C=16 workload")
     lines.append("- **TIGHT**: KV pool will be smaller than demand; server starts but queues at C=16")
     lines.append("- **NO-FIT**: startup OOM; server cannot initialize")
     lines.append("- **UNSUPPORTED**: model/quant format not supported by this vLLM backend")
+    lines.append("- **CRASH**: server process terminated (exit code) — see log tail for details")
+    lines.append("- **TIMEOUT**: server started but did not become healthy within the timeout budget")
     lines.append("")
 
     n_fit = sum(1 for r in rows if r["verdict"] == "FIT")
     n_tight = sum(1 for r in rows if r["verdict"] == "TIGHT")
-    n_no = sum(1 for r in rows if r["verdict"] in ("NO-FIT", "UNSUPPORTED", "TIMEOUT"))
+    n_no = sum(1 for r in rows if r["verdict"] in ("NO-FIT", "UNSUPPORTED", "TIMEOUT", "CRASH"))
     lines.append(f"**Result**: {n_fit} FIT, {n_tight} TIGHT, {n_no} NO-FIT/UNSUPPORTED/TIMEOUT "
                   f"of {len(rows)} cells")
     lines.append("")
