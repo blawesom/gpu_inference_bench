@@ -312,22 +312,32 @@ elif [[ "$VENDOR" == "amd" ]]; then
     GPU_ARGS=(--device /dev/kfd --device /dev/dri)
     log "amd: exposing /dev/kfd + /dev/dri (in-container selection)"
 elif [[ "$VENDOR" == "intel" ]]; then
-    # oneCCL (vLLM XPU engine-core inter-process device-fd sharing) opens
-    # /dev/dri as a DIRECTORY (opendir + readdir renderD*) to build its
-    # device-fd table. Individual --device node flags bind-mount the nodes
-    # but leave /dev/dri unlistable, so oneCCL dies with
-    # "init_device_fds: condition dir failed". Bind-mount the whole directory
-    # instead; in-container select_gpu() then picks the dGPU by VRAM via
-    # torch.xpu (xe driver: renderD12x nodes).
+    # Two requirements, two flag kinds (both needed — each alone fails):
+    #  1. --device per renderD/card node: cgroup device whitelist. Without it
+    #     open() on the render node is denied (EACCES) even for root, so
+    #     Level Zero enumerates 0 devices (torch.xpu.device_count() == 0).
+    #  2. -v /dev/dri:/dev/dri: a listable /dev/dri DIRECTORY with by-path/.
+    #     oneCCL (engine-core inter-process device-fd sharing, after the
+    #     "pidfd is not supported" CCL_WARN) does opendir('/dev/dri/by-path/')
+    #     + readdir of '-render' symlinks (ze_fd_manager::init_device_fds) —
+    #     with --device only, by-path/ is absent and it dies with
+    #     "init_device_fds: condition dir failed".
     [[ -d /dev/dri ]] || die "intel: /dev/dri not found — is the xe kernel module loaded? (lsmod | grep xe)"
     ls /dev/dri/renderD* >/dev/null 2>&1 || die "intel: no /dev/dri/renderD* nodes — is the xe kernel module loaded?"
+    INTEL_NODES=()
+    for n in /dev/dri/renderD* /dev/dri/card*; do
+        [[ -c "$n" ]] && INTEL_NODES+=("$n")
+    done
     GPU_ARGS=(-v /dev/dri:/dev/dri)
+    for n in "${INTEL_NODES[@]}"; do
+        GPU_ARGS+=(--device "$n")
+    done
     # Standard for Intel GPU containers; only added when the group exists
     # (docker rejects unknown group names).
     for g in video render; do
         getent group "$g" >/dev/null 2>&1 && GPU_ARGS+=(--group-add "$g")
     done
-    log "intel: bind-mounting /dev/dri (in-container selection by VRAM)"
+    log "intel: -v /dev/dri:/dev/dri + --device ${INTEL_NODES[*]} (in-container selection by VRAM)"
 fi
 
 # 4. Pre-flight disk gate (hard unless --force)
