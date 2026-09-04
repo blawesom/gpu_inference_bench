@@ -602,6 +602,12 @@ UNSUPPORTED_PATTERNS = re.compile(
     r"not supported|not implemented|no kernel|unsupported|"
     r"no (?:handler|support) for|could not be used|is not available", re.I)
 
+# oneCCL log lines (e.g. "|CCL_WARN| pidfd is not supported, fallbacks to
+# drmfd exchange mode") are benign IPC-fallback noise.  The "not supported"
+# substring there would falsely match the unsupported patterns.
+def _strip_ccl_lines(text: str) -> str:
+    return re.sub(r"[^\n]*\|CCL_(?:WARN|INFO|ERROR)\|[^|\n]*\n?", "", text)
+
 
 def parse_skip_reason(log_path: Path) -> tuple[str, str]:
     """Return (status, reason) from a failed server log."""
@@ -609,14 +615,17 @@ def parse_skip_reason(log_path: Path) -> tuple[str, str]:
         text = log_path.read_text(errors="replace")
     except OSError:
         return "failed", "no-server-log"
-    if OOM_PATTERNS.search(text):
+    # CCL lines can contain "not supported" (benign pidfd->drmfd fallback);
+    # scan the CCL-stripped text for model/quant failure patterns.
+    clean = _strip_ccl_lines(text)
+    if OOM_PATTERNS.search(clean):
         return "skipped", "oom"
     if re.search(r"kv[ -]?cache.{0,40}(fp8|dtype)|fp8.{0,40}(not support|unavail)",
-                 text, re.I):
+                 clean, re.I):
         return "skipped", "kv-fp8-unsupported"
-    m = UNSUPPORTED_PATTERNS.search(text)
+    m = UNSUPPORTED_PATTERNS.search(clean)
     if m:
-        line = text[max(0, m.start() - 60):m.end() + 40].replace("\n", " ")
+        line = clean[max(0, m.start() - 60):m.end() + 40].replace("\n", " ")
         token = re.sub(r"[^a-z0-9]+", "-", line.lower()).strip("-")[:40]
         return "skipped", f"unsupported:{token}"
     return "failed", "engine-startup"

@@ -344,18 +344,24 @@ def _parse_probe_log(log_path: Path) -> dict:
     if m:
         result["max_conc_pct"] = float(m.group(2))
 
-    if OOM_PATTERNS.search(text):
+    # oneCCL log lines (e.g. "|CCL_WARN| pidfd is not supported, fallbacks
+    # to drmfd exchange mode") are benign IPC-fallback noise — without this
+    # filter the "not supported" phrase mis-fires UNSUPPORTED_PATTERNS.
+    # CCL_ERROR lines are kept (a real CCL failure is a real failure).
+    clean = re.sub(r"[^\n]*\|CCL_(?:WARN|INFO)\|[^\n]*\n?", "", text)
+
+    if OOM_PATTERNS.search(clean):
         result["status"] = "OOM"
-    elif UNSUPPORTED_PATTERNS.search(text):
+    elif UNSUPPORTED_PATTERNS.search(clean):
         result["status"] = "UNSUPPORTED"
         # Capture the 3-line context around the match
-        m2 = UNSUPPORTED_PATTERNS.search(text)
+        m2 = UNSUPPORTED_PATTERNS.search(clean)
         if m2:
             start = max(0, m2.start() - 30)
-            end = min(len(text), m2.end() + 60)
-            line_before = text.rfind("\n", 0, start)
-            line_after = text.find("\n", end)
-            result["unsupported_context"] = text[line_before:line_after].strip().replace("\n", " | ")
+            end = min(len(clean), m2.end() + 60)
+            line_before = clean.rfind("\n", 0, start)
+            line_after = clean.find("\n", end)
+            result["unsupported_context"] = clean[line_before:line_after].strip().replace("\n", " | ")
     else:
         result["status"] = "OK"
 
@@ -372,7 +378,7 @@ def _parse_probe_log(log_path: Path) -> dict:
     result["log_tail"] = _log_tail(text)
     # Root-cause line for the report's reason column (vLLM v1's APIServer
     # traceback only says "See root cause above").
-    result["root_cause"] = _root_cause_line(text)
+    result["root_cause"] = _root_cause_line(clean)
 
     return result
 
@@ -452,8 +458,11 @@ def probe_cell(model: dict, cfg: dict, workload: dict, common: dict,
         stop_server(server)
         parsed["probe_cmd"] = s_cmd
         parsed["log"] = server_log.name
-        if exit_code is not None and exit_code != 0:
-            # Server process died on its own — the log tail holds the error.
+        if exit_code is not None:
+            # Server process exited on its own before becoming healthy.
+            # A healthy vLLM server never exits, and vLLM v1 can swallow
+            # engine-core failures and exit rc=0 — so any pre-health exit
+            # is a crash (recorded rc kept for the report).
             parsed["status"] = "CRASH"
             parsed["crash_code"] = exit_code
         elif parsed.get("status") == "OK":
