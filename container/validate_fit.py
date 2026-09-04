@@ -50,10 +50,11 @@ from telemetry import TelemetrySampler  # type: ignore
 
 try:
     from run_matrix import (select_gpu, gpu_name, build_server_cmd,
-                            _expand_model_keys)  # type: ignore
+                            _expand_model_keys, _xpu_devices)  # type: ignore
 except ImportError:
     select_gpu, gpu_name, build_server_cmd = None, None, None
     _expand_model_keys = None  # static-only fallback
+    _xpu_devices = None
 
 HF_CACHE = os.environ.get("HF_HOME", "/hf-cache")
 HEALTH_PATH = "/health"
@@ -525,6 +526,20 @@ def main() -> int:
             m = re.search(r"([\d.]+) MiB", out.stdout)
             if m:
                 vram_gb = float(m.group(1)) / 1024.0
+            else:
+                vram_gb = 32.0
+        elif vendor == "intel" and _xpu_devices is not None:
+            # torch.xpu — same runtime vLLM uses. No blanket fallback:
+            # an Arc B70 has 16 GB, not the 32 GB default below.
+            devs = _xpu_devices()
+            d = None
+            if devs:
+                if gpu_idx is not None and 0 <= gpu_idx < len(devs):
+                    d = devs[gpu_idx]
+                else:
+                    d = devs[0]
+            if d and d.get("total_bytes"):
+                vram_gb = d["total_bytes"] / 1024 ** 3
             else:
                 vram_gb = 32.0
         else:

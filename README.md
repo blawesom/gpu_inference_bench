@@ -15,7 +15,7 @@ and produces a standalone per-machine report.
 ```
 host:  bench.sh
   1. preflight   docker present, vendor detected, disk gates (shared-FS aware)
-  2. detect      nvidia-smi / /dev/kfd / xpu-smi → vendor
+  2. detect      nvidia-smi / /dev/kfd / xpu-smi / xe module → vendor
   3. pull        pinned vLLM image (vllm-openai[-rocm|-xpu]:v0.28.0)
   4. docker run  --entrypoint bash <vendor device flags>
         │
@@ -42,7 +42,9 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
 - Per-vendor stack (the image carries the runtime, the host needs the driver):
   - **NVIDIA**: driver + `nvidia-container-toolkit`
   - **AMD**: ROCm kernel driver (`amdgpu` with KFD)
-  - **Intel**: XPU stack (`xpu-smi` / Level Zero)
+  - **Intel**: `xe` kernel module (Arc A/B dGPUs, e.g. Arc B70) on the host;
+    the Level Zero runtime ships in the vLLM XPU image. `xpu-smi` is optional
+    (host auto-detect only — `xe` module or lspci suffices)
 - Disk: ~100 GB free on the first run (image ~25–35 GB + all model weights ~80 GB
   kept for re-runs).  With `--delete-weights` only ~65 GB is needed (one model at a
   time). `bench.sh` gates this automatically (`--force` to override; `--cache-dir`
@@ -203,7 +205,8 @@ remains as a **no-op** for backward compatibility.
 
 | Symptom | Fix |
 |---|---|
-| `could not detect GPU vendor` | Install the vendor stack (`nvidia-container-toolkit` / AMD KFD / Intel XPU), or pass `--vendor` |
+| `could not detect GPU vendor` | Install the vendor stack (`nvidia-container-toolkit` / AMD KFD / Intel `xe` module), or pass `--vendor` |
+| `no XPU device visible in the container` | Intel: check the `xe` module is loaded (`lsmod \| grep xe`) and `/dev/dri/renderD*` exists; `bench.sh --dry-run` should show `--device /dev/dri/renderD12x` in the docker command. Inside the container, `zeinfo` must list the card |
 | `no NVIDIA GPU found` | Check `nvidia-smi -L`; pass `--gpu-index` to pick a card |
 | disk gate aborts | Weights are kept by default (whole set ≈ 85 GB). Use `--delete-weights` to restore the old one-model-at-a-time footprint, `--cache-dir <bigger volume>`, `./clean.sh` to free space, or `--force` |
 | need to free weight disk | `./clean.sh` (all) or `./clean.sh M1,M2` (specific models) |

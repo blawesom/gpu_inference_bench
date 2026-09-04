@@ -175,16 +175,29 @@ class TelemetrySampler:
         return None
 
     def _sample_intel(self) -> Optional[dict]:
-        # best-effort: xpu-smi preferred, intel_gpu_top fallback. No reliable
-        # power field → power stays null.
+        # best-effort. xpu-smi (XPU-SMI-Lib) is the reliable tool on
+        # xe-based GPUs (Arc A/B, e.g. B70); intel_gpu_top is i915-only
+        # and kept only as a last-resort fallback. No reliable power
+        # field → power stays null.
         env = {k: v for k, v in os.environ.items()
                if k not in ("ONEAPI_DEVICE_SELECTOR",)}
-        out = _run(["xpu-smi", "dump", "-d", str(self.gpu_index or 0),
+        idx = str(self.gpu_index if self.gpu_index is not None else 0)
+        out = _run(["xpu-smi", "dump", "-d", idx,
                     "-m", "gpu_utilization,mem_used"], env=env, timeout=10.0)
         if out:
             m = re.search(r"gpu_utilization[\"':\s]+(\d+(?:\.\d+)?)", out)
-            if m:
-                return {"mem_used_gb": None, "util_pct": float(m.group(1)),
+            m_mem = re.search(r"mem_used[\"':\s]+(\d+(?:\.\d+)?)", out)
+            if m or m_mem:
+                mem_gb = None
+                if m_mem:
+                    v = float(m_mem.group(1))
+                    # Unit heuristic: xpu-smi reports bytes for large
+                    # values, MiB in some builds — distinguish by magnitude
+                    # (a fully used 16 GB card is ~1.7e10 bytes vs ~1.6e4 MiB).
+                    mem_gb = round(v / 1024 ** 3, 2) if v >= 10 ** 8 \
+                        else round(v / 1024.0, 2)
+                return {"mem_used_gb": mem_gb,
+                        "util_pct": (float(m.group(1)) if m else None),
                         "power_w": None}
         out = _run(["intel_gpu_top", "-l", "-s", "1"], env=env, timeout=10.0)
         if out:

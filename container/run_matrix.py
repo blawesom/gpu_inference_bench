@@ -70,6 +70,48 @@ def _run_cmd(cmd: list[str], env: dict | None = None, timeout: float = 20.0) -> 
     return None
 
 
+# ── Intel XPU enumeration (torch.xpu — the runtime vLLM itself uses) ─────────
+_XPU_PROBE = (
+    "import json, torch\n"
+    "try:\n"
+    "    n = torch.xpu.device_count() if torch.xpu.is_available() else 0\n"
+    "except Exception:\n"
+    "    n = 0\n"
+    "print(json.dumps([{'index': i,\n"
+    "                   'name': torch.xpu.get_device_name(i),\n"
+    "                   'total_bytes': torch.xpu.mem_get_info(i)[1]}\n"
+    "                  for i in range(n)]))"
+)
+_XPU_DEVS: list[dict] | None = None
+
+
+def _xpu_devices(timeout: float = 180.0) -> list[dict]:
+    """Enumerate XPU devices via torch.xpu (PyTorch XPU / Level Zero).
+
+    The vLLM XPU image ships a SYCL PyTorch build, so torch.xpu is the
+    exact runtime `vllm serve` uses — no dependency on optional CLIs
+    (xpu-smi, zeinfo) that the image may lack.
+
+    Returns [{'index': <Level Zero index>, 'name': str,
+              'total_bytes': int}, ...]. Empty list if torch.xpu is
+    unavailable or no device is visible (e.g. the DRI render node was
+    not passed into the container).
+
+    Probed once per process, before select_gpu() applies
+    ONEAPI_DEVICE_SELECTOR, so indices are *physical* (unfiltered) — the
+    same contract as the AMD path (unfiltered rocm-smi table).
+    """
+    global _XPU_DEVS
+    if _XPU_DEVS is None:
+        out = _run_cmd(["python3", "-c", _XPU_PROBE], timeout=timeout)
+        try:
+            devs = json.loads(out or "[]")
+            _XPU_DEVS = devs if isinstance(devs, list) else []
+        except json.JSONDecodeError:
+            _XPU_DEVS = []
+    return _XPU_DEVS
+
+
 def slugify(name: str) -> str:
     """Lowercase, non-alphanumeric → hyphen."""
     s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
@@ -111,6 +153,16 @@ def gpu_name(vendor: str, idx: int | None = None) -> str:
                         return name or f"amd-gpu"
         return f"amd-gpu"
     if vendor == "intel":
+        devs = _xpu_devices()
+        d = None
+        if devs:
+            if idx is not None and 0 <= idx < len(devs):
+                d = devs[idx]
+            else:
+                d = max(devs, key=lambda x: x.get("total_bytes") or 0)
+        if d and d.get("name"):
+            return d["name"]
+        # fallback: xpu-smi (not always in the image)
         out = _run_cmd(["xpu-smi", "discovery"], timeout=30.0)
         if out:
             m = re.search(
@@ -205,13 +257,31 @@ def collect_environment(vendor: str, gpu_index: int | None, gpu: str) -> dict:
         if m:
             env["vram_total_gb"] = round(int(m.group(1)) / 1024 ** 3, 1)
     elif vendor == "intel":
-        out = _run_cmd(["xpu-smi", "discovery"], timeout=30.0)
-        m = re.search(
-            r"^\s*\|(?:\s*(?:iGPU|dGPU|Discrete GPU))\s*\|\s*\d+\s*\|[^|]*\|\s*([^|]+?)\s*\|",
-            out or "", re.M)
-        if m:
-            env["driver"] = m.group(1)
-            env["stack"]["xpu"] = m.group(1)
+        devs = _xpu_devices()
+        d = None
+        if devs:
+            if gpu_index is not None and 0 <= gpu_index < len(devs):
+                d = devs[gpu_index]
+            else:
+                d = devs[0]
+        if d and d.get("total_bytes"):
+            env["vram_total_gb"] = round(d["total_bytes"] / 1024 ** 3, 1)
+        # driver: xe for Arc A/B dGPUs (B70 et al.), i915 for legacy;
+        # xpu-smi discovery as last resort.
+        for mod in ("xe", "i915"):
+            v = (_read_file(f"/sys/module/{mod}/version") or "").strip()
+            if v:
+                env["driver"] = f"{mod} {v}"
+                env["stack"]["xpu"] = f"{mod} {v}"
+                break
+        if not env["driver"]:
+            out = _run_cmd(["xpu-smi", "discovery"], timeout=30.0)
+            m = re.search(
+                r"^\s*\|(?:\s*(?:iGPU|dGPU|Discrete GPU))\s*\|\s*\d+\s*\|[^|]*\|\s*([^|]+?)\s*\|",
+                out or "", re.M)
+            if m:
+                env["driver"] = m.group(1)
+                env["stack"]["xpu"] = m.group(1)
 
     cuda, hip = _torch_stack()
     env["stack"]["cuda"] = cuda
@@ -245,7 +315,9 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
         table, so it needs the physical index to pick the right row).
       * NVIDIA: 0 (bench.sh passes --gpus device=N, so only one GPU is
         visible in the container and it is device 0).
-      * Intel: 0.
+      * Intel: the physical Level Zero index of the selected device
+        (auto-picked by VRAM so a dGPU wins over an iGPU); applied
+        via ONEAPI_DEVICE_SELECTOR=level_zero/<idx>.
     """
     vendor = (vendor or "auto").lower()
     if vendor == "amd":
@@ -272,9 +344,27 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
               "(single GPU via --gpus device=N)")
         return 0
     if vendor == "intel":
-        os.environ.setdefault("ONEAPI_DEVICE_SELECTOR", "level_zero/0")
-        print("[gpu-select] Intel: level_zero/0")
-        return 0
+        devs = _xpu_devices()
+        if not devs:
+            raise SystemExit(
+                "ERROR: no XPU device visible in the container "
+                "(torch.xpu.device_count() == 0). Check on the host:\n"
+                "  1. xe kernel module loaded:  lsmod | grep xe\n"
+                "  2. DRI nodes present:        ls -l /dev/dri\n"
+                "  3. bench.sh --dry-run shows: --device /dev/dri/renderD12x\n"
+                "  4. inside this container:    zeinfo (should list the card)")
+        if forced_idx is not None and not 0 <= forced_idx < len(devs):
+            raise SystemExit(f"ERROR: XPU index {forced_idx} not present "
+                             f"(available: {list(range(len(devs)))})")
+        idx = (forced_idx if forced_idx is not None
+               else max(range(len(devs)),
+                        key=lambda i: devs[i].get("total_bytes") or 0))
+        d = devs[idx]
+        os.environ["ONEAPI_DEVICE_SELECTOR"] = f"level_zero/{idx}"
+        total_gb = (d.get("total_bytes") or 0) // (1024 ** 3)
+        print(f"[gpu-select] Intel idx {idx} ({d.get('name') or 'XPU'}, "
+              f"{total_gb} GB) → ONEAPI_DEVICE_SELECTOR=level_zero/{idx}")
+        return idx
     raise SystemExit(f"ERROR: unsupported GPU_VENDOR {vendor!r} "
                      f"(expect amd|nvidia|intel)")
 

@@ -72,10 +72,14 @@ No Dockerfiles: vLLM's official pre-built images are the inference environment.
 |---------|--------------------------------------------------------|---------------------------------------------------------------------------------------|
 | NVIDIA  | `lspci \| grep -i nvidia` or `nvidia-smi` exits 0     | `--gpus all` (nvidia-container-toolkit required; `--runtime=nvidia` fallback)          |
 | AMD     | `lspci \| grep -i 'amd.*vga'` or `/dev/kfd` exists     | `--device=/dev/kfd --device=/dev/dri --group-add=video --security-opt seccomp=unconfined` |
-| Intel   | `lspci \| grep -iE 'intel.*(vga|3d)'` or `/dev/dri/renderD*` | `--device=/dev/dri --group-add=video`                                             |
+| Intel   | `xpu-smi discovery` succeeds **or** `/sys/module/xe` exists (Arc A/B dGPUs)
+|         | **or** `lspci` shows Intel VGA/3D                         | Pass all `/dev/dri/renderD*` and `/dev/dri/card*` nodes
+|         |                                                        | (`torch.xpu` in-container auto-selects the largest dGPU via VRAM)
+|         |                                                        | `--group-add=video --group-add=render` (where groups exist)
+
 
 No vendor detected → exit with hint. `--vendor` flag can force.
-Single-GPU scope: index 0 only, **except when multiple devices are present → pick the one with the largest VRAM**. Set the device index inside the container (`CUDA_VISIBLE_DEVICES=$IDX` for NVIDIA, `HIP_VISIBLE_DEVICES=$IDX` for AMD, `ONEAPI_DEVICE_SELECTOR=0` for Intel) and restrict docker GPU passthrough to that device (`--gpus 'device=$IDX'` for NVIDIA; AMD/Intel pass-through unchanged, env var selects).
+Single-GPU scope: index 0 only, **except when multiple devices are present → pick the one with the largest VRAM**. Set the device index inside the container (`CUDA_VISIBLE_DEVICES=$IDX` for NVIDIA, `HIP_VISIBLE_DEVICES=$IDX` for AMD, `ONEAPI_DEVICE_SELECTOR=level_zero/<IDX>` for Intel) and restrict docker GPU passthrough to that device (`--gpus 'device=$IDX'` for NVIDIA; AMD/Intel pass-through unchanged, env var selects).
 
 > **Image entrypoint gotcha (verified v0.28.0, all three official images):**
 > the images set `ENTRYPOINT ["vllm", "serve"]`. `docker run IMAGE bash -s` would
@@ -90,7 +94,7 @@ Single-GPU scope: index 0 only, **except when multiple devices are present → p
 - CPU model + core count, host RAM
 - Docker version, **image name + pinned tag + image digest**
 - vLLM version (`vllm --version` in container)
-- **Visible GPU in container** (runtime-verified: `nvidia-smi` / `rocm-smi --showproductname` / `ls /dev/dri`) — confirms the host-side largest-VRAM selection actually landed
+- **Visible GPU in container** (runtime-verified: `nvidia-smi` / `rocm-smi --showproductname` / `torch.xpu.device_count()` + `torch.xpu.get_device_name()` on XPU; confirms the host-side largest-VRAM selection actually landed)
 
 ---
 

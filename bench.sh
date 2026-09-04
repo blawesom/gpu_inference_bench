@@ -165,11 +165,18 @@ fi
 detect_vendor() {
     if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
         echo "nvidia"
+    elif command -v xpu-smi >/dev/null 2>&1 && xpu-smi discovery >/dev/null 2>&1; then
+        # Checked before /dev/kfd: on mixed AMD+Intel hosts, /dev/kfd exists
+        # just because ROCm is installed. A real Intel XPU present wins.
+        echo "intel"
     elif [[ -e /dev/kfd ]]; then
         echo "amd"
-    elif command -v xpu-smi >/dev/null 2>&1 && xpu-smi discovery >/dev/null 2>&1; then
+    elif [[ -d /sys/module/xe ]]; then
+        # xe kernel module = discrete Intel GPU (Arc A/B, e.g. Arc B70).
+        # intel_gpu_top (intel-gpu-tools) is i915-only and cannot see xe
+        # devices, so it is deliberately not used as a signal.
         echo "intel"
-    elif command -v intel_gpu_top >/dev/null 2>&1; then
+    elif lspci 2>/dev/null | grep -qiE 'intel.*(display|vga|3d)'; then
         echo "intel"
     else
         echo "unknown"
@@ -275,7 +282,7 @@ if [[ -z "$VENDOR" ]]; then
 fi
 case "$VENDOR" in
     nvidia|amd|intel) log "vendor: $VENDOR (vLLM $VLLM_VERSION)" ;;
-    *) die "could not detect GPU vendor (nvidia-smi / /dev/kfd / xpu-smi); pass --vendor" ;;
+    *) die "could not detect GPU vendor (nvidia-smi / /dev/kfd / xpu-smi / xe module); pass --vendor" ;;
 esac
 
 # 2. Image
@@ -300,8 +307,26 @@ elif [[ "$VENDOR" == "amd" ]]; then
     GPU_ARGS=(--device /dev/kfd --device /dev/dri)
     log "amd: exposing /dev/kfd + /dev/dri (in-container selection)"
 elif [[ "$VENDOR" == "intel" ]]; then
-    GPU_ARGS=(--device /dev/dri)
-    log "intel: exposing /dev/dri (best-effort)"
+    # docker --device wants real device nodes, not the /dev/dri directory.
+    # Pass every DRI node explicitly; the in-container select_gpu() then
+    # picks the dGPU by VRAM via torch.xpu (xe driver: renderD12x nodes).
+    INTEL_NODES=()
+    for n in /dev/dri/renderD* /dev/dri/card*; do
+        [[ -c "$n" ]] && INTEL_NODES+=("$n")
+    done
+    if [[ ${#INTEL_NODES[@]} -eq 0 ]]; then
+        die "intel: no /dev/dri/renderD* device nodes — is the xe kernel module loaded? (lsmod | grep xe)"
+    fi
+    GPU_ARGS=()
+    for n in "${INTEL_NODES[@]}"; do
+        GPU_ARGS+=(--device "$n")
+    done
+    # Standard for Intel GPU containers; only added when the group exists
+    # (docker rejects unknown group names).
+    for g in video render; do
+        getent group "$g" >/dev/null 2>&1 && GPU_ARGS+=(--group-add "$g")
+    done
+    log "intel: exposing ${INTEL_NODES[*]}"
 fi
 
 # 4. Pre-flight disk gate (hard unless --force)
