@@ -308,9 +308,9 @@ def _root_cause_line(text: str) -> str:
                 r"\(EngineCore[^)]*\)\s*ERROR\b"):
         m = [l.strip() for l in lines if re.search(pat, l, re.I)]
         if m:
-            return m[-1][:240]
+            return m[-1][:500]
     m = [l.strip() for l in lines if re.search(r"\bERROR\b", l)]
-    return m[0][:240] if m else ""
+    return m[0][:500] if m else ""
 
 
 def _parse_probe_log(log_path: Path) -> dict:

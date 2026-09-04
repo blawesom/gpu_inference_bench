@@ -73,7 +73,7 @@ No Dockerfiles: vLLM's official pre-built images are the inference environment.
 | NVIDIA  | `lspci \| grep -i nvidia` or `nvidia-smi` exits 0     | `--gpus all` (nvidia-container-toolkit required; `--runtime=nvidia` fallback)          |
 | AMD     | `lspci \| grep -i 'amd.*vga'` or `/dev/kfd` exists     | `--device=/dev/kfd --device=/dev/dri --group-add=video --security-opt seccomp=unconfined` |
 | Intel   | `xpu-smi discovery` succeeds **or** `/sys/module/xe` exists (Arc A/B dGPUs)
-|         | **or** `lspci` shows Intel VGA/3D                         | Pass all `/dev/dri/renderD*` and `/dev/dri/card*` nodes
+|         | **or** `lspci` shows Intel VGA/3D                         | Bind-mount `-v /dev/dri:/dev/dri` (oneCCL does `opendir` on it)
 |         |                                                        | (`torch.xpu` in-container auto-selects the largest dGPU via VRAM)
 |         |                                                        | `--group-add=video --group-add=render` (where groups exist)
 

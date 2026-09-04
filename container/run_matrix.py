@@ -382,7 +382,7 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
                 "(torch.xpu.device_count() == 0). Check on the host:\n"
                 "  1. xe kernel module loaded:  lsmod | grep xe\n"
                 "  2. DRI nodes present:        ls -l /dev/dri\n"
-                "  3. bench.sh --dry-run shows: --device /dev/dri/renderD12x\n"
+                "  3. bench.sh --dry-run shows: -v /dev/dri:/dev/dri\n"
                 "  4. inside this container:    zeinfo (should list the card)")
         if forced_idx is not None and not 0 <= forced_idx < len(devs):
             raise SystemExit(f"ERROR: XPU index {forced_idx} not present "

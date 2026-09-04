@@ -312,26 +312,22 @@ elif [[ "$VENDOR" == "amd" ]]; then
     GPU_ARGS=(--device /dev/kfd --device /dev/dri)
     log "amd: exposing /dev/kfd + /dev/dri (in-container selection)"
 elif [[ "$VENDOR" == "intel" ]]; then
-    # docker --device wants real device nodes, not the /dev/dri directory.
-    # Pass every DRI node explicitly; the in-container select_gpu() then
-    # picks the dGPU by VRAM via torch.xpu (xe driver: renderD12x nodes).
-    INTEL_NODES=()
-    for n in /dev/dri/renderD* /dev/dri/card*; do
-        [[ -c "$n" ]] && INTEL_NODES+=("$n")
-    done
-    if [[ ${#INTEL_NODES[@]} -eq 0 ]]; then
-        die "intel: no /dev/dri/renderD* device nodes — is the xe kernel module loaded? (lsmod | grep xe)"
-    fi
-    GPU_ARGS=()
-    for n in "${INTEL_NODES[@]}"; do
-        GPU_ARGS+=(--device "$n")
-    done
+    # oneCCL (vLLM XPU engine-core inter-process device-fd sharing) opens
+    # /dev/dri as a DIRECTORY (opendir + readdir renderD*) to build its
+    # device-fd table. Individual --device node flags bind-mount the nodes
+    # but leave /dev/dri unlistable, so oneCCL dies with
+    # "init_device_fds: condition dir failed". Bind-mount the whole directory
+    # instead; in-container select_gpu() then picks the dGPU by VRAM via
+    # torch.xpu (xe driver: renderD12x nodes).
+    [[ -d /dev/dri ]] || die "intel: /dev/dri not found — is the xe kernel module loaded? (lsmod | grep xe)"
+    ls /dev/dri/renderD* >/dev/null 2>&1 || die "intel: no /dev/dri/renderD* nodes — is the xe kernel module loaded?"
+    GPU_ARGS=(-v /dev/dri:/dev/dri)
     # Standard for Intel GPU containers; only added when the group exists
     # (docker rejects unknown group names).
     for g in video render; do
         getent group "$g" >/dev/null 2>&1 && GPU_ARGS+=(--group-add "$g")
     done
-    log "intel: exposing ${INTEL_NODES[*]}"
+    log "intel: bind-mounting /dev/dri (in-container selection by VRAM)"
 fi
 
 # 4. Pre-flight disk gate (hard unless --force)
