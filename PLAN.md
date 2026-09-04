@@ -79,7 +79,7 @@ No Dockerfiles: vLLM's official pre-built images are the inference environment.
 
 
 No vendor detected → exit with hint. `--vendor` flag can force.
-Single-GPU scope: index 0 only, **except when multiple devices are present → pick the one with the largest VRAM**. Set the device index inside the container (`CUDA_VISIBLE_DEVICES=$IDX` for NVIDIA, `HIP_VISIBLE_DEVICES=$IDX` for AMD, `ONEAPI_DEVICE_SELECTOR=level_zero/<IDX>:*` for Intel — the trailing `:*` subdevice component is required by the OneAPI runtime, an incomplete selector aborts) and restrict docker GPU passthrough to that device (`--gpus 'device=$IDX'` for NVIDIA; AMD/Intel pass-through unchanged, env var selects).
+Single-GPU scope: index 0 only, **except when multiple devices are present → pick the one with the largest VRAM**. Set the device index inside the container (`CUDA_VISIBLE_DEVICES=$IDX` for NVIDIA, `HIP_VISIBLE_DEVICES=$IDX` for AMD, `ONEAPI_DEVICE_SELECTOR=level_zero:<IDX>` for Intel — colon syntax, required by the current oneAPI/SYCL runtime (older slash-based forms abort with "Incomplete selector!" / "Backend is required but missing") and restrict docker GPU passthrough to that device (`--gpus 'device=$IDX'` for NVIDIA; AMD/Intel pass-through unchanged, env var selects).
 
 > **Image entrypoint gotcha (verified v0.28.0, all three official images):**
 > the images set `ENTRYPOINT ["vllm", "serve"]`. `docker run IMAGE bash -s` would

@@ -84,6 +84,34 @@ _XPU_PROBE = (
 )
 _XPU_DEVS: list[dict] | None = None
 
+# Probe the *filtered* view under the current ONEAPI_DEVICE_SELECTOR: a
+# malformed selector makes the SYCL runtime abort the process at init
+# ("Incomplete selector!" / "Backend is required but missing"), so the
+# subprocess dies non-zero and prints nothing usable.
+_XPU_SEL_PROBE = (
+    "import json, torch\n"
+    "try:\n"
+    "    n = torch.xpu.device_count() if torch.xpu.is_available() else 0\n"
+    "    name = torch.xpu.get_device_name(0) if n else ''\n"
+    "    print(json.dumps({'n': n, 'name': name}))\n"
+    "except Exception:\n"
+    "    print(json.dumps({'n': -1, 'name': ''}))"
+)
+
+
+def _xpu_probe_selection(timeout: float = 180.0) -> tuple[int, str] | None:
+    """(device_count, name_of_device_0) under the current env (selector
+    applied), or None if the SYCL runtime rejected the process (bad
+    selector format aborts before any output)."""
+    out = _run_cmd(["python3", "-c", _XPU_SEL_PROBE], timeout=timeout)
+    if not out:
+        return None
+    try:
+        d = json.loads(out.strip().splitlines()[-1])
+        return int(d["n"]), str(d.get("name", ""))
+    except (ValueError, KeyError, IndexError):
+        return None
+
 
 def _xpu_devices(timeout: float = 180.0) -> list[dict]:
     """Enumerate XPU devices via torch.xpu (PyTorch XPU / Level Zero).
@@ -317,9 +345,10 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
         visible in the container and it is device 0).
       * Intel: the physical Level Zero index of the selected device
         (auto-picked by VRAM so a dGPU wins over an iGPU); applied
-        via ONEAPI_DEVICE_SELECTOR=level_zero/<idx>:* (the trailing :*
-        subdevice component is required by the OneAPI runtime — an
-        incomplete selector aborts with "Incomplete selector!").
+        via ONEAPI_DEVICE_SELECTOR=level_zero/<idx> (colon syntax — the
+        current oneAPI/SYCL runtime rejects the older slash-based forms;
+        a verification probe confirms the runtime accepts it before any
+        server is launched).
     """
     vendor = (vendor or "auto").lower()
     if vendor == "amd":
@@ -362,10 +391,25 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
                else max(range(len(devs)),
                         key=lambda i: devs[i].get("total_bytes") or 0))
         d = devs[idx]
-        os.environ["ONEAPI_DEVICE_SELECTOR"] = f"level_zero/{idx}:*"
+        # Colon syntax: 'level_zero:<idx>'. The OneAPI/SYCL runtime rejects
+        # the older 'level_zero/<idx>' and 'level_zero/<idx>:*' forms
+        # ("Incomplete selector!" / "Backend is required but missing").
+        os.environ["ONEAPI_DEVICE_SELECTOR"] = f"level_zero:{idx}"
+        # Verify the SYCL runtime accepts the selector before launching any
+        # server. A malformed value aborts the process at device init, which
+        # would otherwise surface as one crashed vLLM server per cell instead
+        # of one failed probe here (~15s).
+        sel = _xpu_probe_selection()
+        if sel is None or sel[0] != 1:
+            raise SystemExit(
+                f"ERROR: ONEAPI_DEVICE_SELECTOR=level_zero:{idx} not accepted "
+                f"by the SYCL runtime (probe saw {sel}). The selector format "
+                f"varies across oneAPI releases — try 'level_zero/{idx}:*' or "
+                f"SYCL_DEVICE_FILTER inside the container.")
         total_gb = (d.get("total_bytes") or 0) // (1024 ** 3)
         print(f"[gpu-select] Intel idx {idx} ({d.get('name') or 'XPU'}, "
-              f"{total_gb} GB) → ONEAPI_DEVICE_SELECTOR=level_zero/{idx}:*")
+              f"{total_gb} GB) → ONEAPI_DEVICE_SELECTOR=level_zero:{idx} "
+              f"(verified: {sel[0]} device visible, {sel[1]})")
         return idx
     raise SystemExit(f"ERROR: unsupported GPU_VENDOR {vendor!r} "
                      f"(expect amd|nvidia|intel)")
