@@ -310,6 +310,21 @@ def collect_environment(vendor: str, gpu_index: int | None, gpu: str) -> dict:
             if m:
                 env["driver"] = m.group(1)
                 env["stack"]["xpu"] = m.group(1)
+        # Telemetry source probe (best-effort, never fatal): record which
+        # sources this host's GPU telemetry will come from — xe sysfs
+        # (freq/temp/power) and/or xpu-smi (util/mem) — so a run that
+        # reports "n/a" power says so explicitly instead of silently.
+        if TelemetrySampler is not None:
+            try:
+                probe_sampler = TelemetrySampler("intel", gpu_index)
+                if probe_sampler.probe() is not None:
+                    src = probe_sampler.metric_sources()
+                    env["telemetry_metrics"] = {
+                        m: src.get(m, "none")
+                        for m in ("frequency", "temperature", "power",
+                                  "utilization", "memory")}
+            except Exception:
+                pass
 
     cuda, hip = _torch_stack()
     env["stack"]["cuda"] = cuda

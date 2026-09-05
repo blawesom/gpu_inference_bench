@@ -44,7 +44,11 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
   - **AMD**: ROCm kernel driver (`amdgpu` with KFD)
   - **Intel**: `xe` kernel module (Arc A/B dGPUs, e.g. Arc B70) on the host;
     the Level Zero runtime ships in the vLLM XPU image. `xpu-smi` is optional
-    (host auto-detect only — `xe` module or lspci suffices)
+    (host auto-detect only — `xe` module or lspci suffices). GPU power/temperature
+    telemetry reads the xe driver's sysfs directly (no extra tools needed);
+    temperature/power additionally require a recent kernel with the xe hwmon
+    driver. The run records which telemetry sources are available in
+    `environment.json` (`telemetry_metrics`)
 - Disk: ~100 GB free on the first run (image ~25–35 GB + all model weights ~80 GB
   kept for re-runs).  With `--delete-weights` only ~65 GB is needed (one model at a
   time). `bench.sh` gates this automatically (`--force` to override; `--cache-dir`
@@ -119,6 +123,7 @@ results/<YYYYMMDD-HHMMSS>_<gpu-model>/     # e.g. results/20260902-160512_nvidia
 ├── server_<model>_<config>.log            # raw vLLM server log per cell
 ├── bench_<model>_<config>_<C>.json        # raw vllm bench serve output per level
 └── telemetry_<model>_<config>_<C>.json    # 1 Hz GPU mem/util/power per level
+                                           #   (+temp/freq on Intel xe)
 results/.latest       # basename of the most recent run dir
 ```
 
@@ -131,7 +136,10 @@ Per (model, config, concurrency) the report carries, from `vllm bench serve`:
 TTFT / TPOT / ITL at p50/p90/p99, request & output token throughput,
 completed/failed counts, wall time — plus our 1 Hz GPU telemetry (memory
 peak/avg, utilization avg/peak, power avg/peak where the vendor tool exposes
-it; otherwise `n/a`).
+it; otherwise `n/a`). On Intel (xe) the sampler additionally captures GPU
+power, temperature, and clock frequency from the xe driver's sysfs (with
+xpu-smi as fallback) — these are additive fields on the per-level `telemetry`
+object; the report table columns are unchanged.
 
 ### Workload
 
@@ -225,5 +233,7 @@ remains as a **no-op** for backward compatibility.
   random workload.
 - `--enable-prefix-caching` is deliberately off (it distorts synthetic-token
   throughput).
-- Power draw is best-effort: `null` ("n/a") where the vendor tool lacks it.
+- Power draw is best-effort: `null` ("n/a") where no vendor tool or driver
+  exposes it (Intel: needs a recent kernel with the xe hwmon driver, or
+  xpu-smi in the image).
 - Reports are per-machine by design; there is no cross-run diff mode.
