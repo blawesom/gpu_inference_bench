@@ -206,7 +206,7 @@ remains as a **no-op** for backward compatibility.
 | Symptom | Fix |
 |---|---|
 | `could not detect GPU vendor` | Install the vendor stack (`nvidia-container-toolkit` / AMD KFD / Intel `xe` module), or pass `--vendor` |
-| `no XPU device visible in the container` | Intel: check the `xe` module is loaded (`lsmod \| grep xe`) and `/dev/dri` exists; `bench.sh --dry-run` should show `-v /dev/dri:/dev/dri` in the docker command (oneCCL opens it as a directory). Inside the container, `zeinfo` must list the card |
+| `no XPU device visible in the container` | Intel: check the `xe` module is loaded (`lsmod \| grep xe`) and `/dev/dri` exists; `bench.sh --dry-run` should show `-v /dev/dri:/dev/dri` + `--device` per render node (see [intel-xpu-dev-dri](docs/intel-xpu-dev-dri.md) for why both are required). Inside the container, `zeinfo` must list the card |
 | `no NVIDIA GPU found` | Check `nvidia-smi -L`; pass `--gpu-index` to pick a card |
 | disk gate aborts | Weights are kept by default (whole set ≈ 85 GB). Use `--delete-weights` to restore the old one-model-at-a-time footprint, `--cache-dir <bigger volume>`, `./clean.sh` to free space, or `--force` |
 | need to free weight disk | `./clean.sh` (all) or `./clean.sh M1,M2` (specific models) |

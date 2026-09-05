@@ -73,7 +73,7 @@ No Dockerfiles: vLLM's official pre-built images are the inference environment.
 | NVIDIA  | `lspci \| grep -i nvidia` or `nvidia-smi` exits 0     | `--gpus all` (nvidia-container-toolkit required; `--runtime=nvidia` fallback)          |
 | AMD     | `lspci \| grep -i 'amd.*vga'` or `/dev/kfd` exists     | `--device=/dev/kfd --device=/dev/dri --group-add=video --security-opt seccomp=unconfined` |
 | Intel   | `xpu-smi discovery` succeeds **or** `/sys/module/xe` exists (Arc A/B dGPUs)
-|         | **or** `lspci` shows Intel VGA/3D                         | `-v /dev/dri:/dev/dri` (for `by-path/` directory listing) + `--device` per node (for cgroup `open()` permission) — oneCCL does `opendir("/dev/dri/by-path/")` to find `-render` symlinks
+|         | **or** `lspci` shows Intel VGA/3D                         | `-v /dev/dri:/dev/dri` (for `by-path/` directory listing) + `--device` per node (for cgroup `open()` permission) — oneCCL does `opendir("/dev/dri/by-path/")` to find `-render` symlinks. Full root-cause: [docs/intel-xpu-dev-dri.md](docs/intel-xpu-dev-dri.md)
 |         |                                                        | (`torch.xpu` in-container auto-selects the largest dGPU via VRAM)
 |         |                                                        | `--group-add=video --group-add=render` (where groups exist)
 
