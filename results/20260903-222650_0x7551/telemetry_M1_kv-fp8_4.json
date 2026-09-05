@@ -1,0 +1,10 @@
+{
+  "n_samples": 216,
+  "duration_s": 215.01,
+  "mem_peak_gb": 26.44,
+  "mem_avg_gb": 26.41,
+  "util_avg_pct": 96.9,
+  "util_peak_pct": 100.0,
+  "power_avg_w": 208.8,
+  "power_peak_w": 254.0
+}

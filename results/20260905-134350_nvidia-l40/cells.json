@@ -1,0 +1,497 @@
+{
+  "schema_version": 1,
+  "run_id": "20260905-134350_nvidia-l40",
+  "workload": {
+    "dataset": "random",
+    "random_input_len": 512,
+    "random_output_len": 256,
+    "num_prompts": 50,
+    "num_warmups": 2,
+    "concurrency_levels": [
+      1,
+      4,
+      8,
+      16
+    ],
+    "seed": 42,
+    "temperature": 0.0,
+    "ignore_eos": true,
+    "backend": "openai-chat",
+    "endpoint": "/v1/chat/completions",
+    "percentile_metrics": "ttft,tpot,itl",
+    "metric_percentiles": "50,90,99"
+  },
+  "common_server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "gpu_memory_utilization": 0.9,
+    "max_num_seqs": 16,
+    "trust_remote_code": true
+  },
+  "models": {
+    "M1": {
+      "id": "Qwen/Qwen3.5-9B",
+      "class": "dense-9b",
+      "format": "bf16",
+      "weights_gb": 19.3,
+      "max_model_len": 8192,
+      "configs": [
+        "baseline",
+        "kv-fp8",
+        "long-context"
+      ]
+    },
+    "M2": {
+      "id": "openai/gpt-oss-20b",
+      "class": "moe-small",
+      "format": "mxfp4",
+      "weights_gb": 13.8,
+      "max_model_len": 8192,
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    },
+    "M3": {
+      "id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "class": "dense-27b",
+      "format": "awq4",
+      "weights_gb": 21.0,
+      "gpu_memory_utilization": 0.95,
+      "max_model_len": 2048,
+      "flags": {
+        "max-num-batched-tokens": 2048
+      },
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    },
+    "M4": {
+      "id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "class": "moe-35b-a3b",
+      "format": "awq4",
+      "weights_gb": 24.5,
+      "gpu_memory_utilization": 0.95,
+      "max_model_len": 2048,
+      "flags": {
+        "max-num-batched-tokens": 2048
+      },
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    }
+  },
+  "cells": [
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16
+      },
+      "server_log": "server_M1_baseline.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M1_baseline_1.json",
+          "telemetry_json": "telemetry_M1_baseline_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 317.8
+        },
+        "4": {
+          "bench_json": "bench_M1_baseline_4.json",
+          "telemetry_json": "telemetry_M1_baseline_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 106.3
+        },
+        "8": {
+          "bench_json": "bench_M1_baseline_8.json",
+          "telemetry_json": "telemetry_M1_baseline_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 68.8
+        },
+        "16": {
+          "bench_json": "bench_M1_baseline_16.json",
+          "telemetry_json": "telemetry_M1_baseline_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 50.4
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8"
+      },
+      "server_log": "server_M1_kv-fp8.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M1_kv-fp8_1.json",
+          "telemetry_json": "telemetry_M1_kv-fp8_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 316.0
+        },
+        "4": {
+          "bench_json": "bench_M1_kv-fp8_4.json",
+          "telemetry_json": "telemetry_M1_kv-fp8_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 105.9
+        },
+        "8": {
+          "bench_json": "bench_M1_kv-fp8_8.json",
+          "telemetry_json": "telemetry_M1_kv-fp8_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 68.4
+        },
+        "16": {
+          "bench_json": "bench_M1_kv-fp8_16.json",
+          "telemetry_json": "telemetry_M1_kv-fp8_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 49.9
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "long-context",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16
+      },
+      "server_log": "server_M1_long-context.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M1_long-context_1.json",
+          "telemetry_json": "telemetry_M1_long-context_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 317.4
+        },
+        "4": {
+          "bench_json": "bench_M1_long-context_4.json",
+          "telemetry_json": "telemetry_M1_long-context_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 106.4
+        },
+        "8": {
+          "bench_json": "bench_M1_long-context_8.json",
+          "telemetry_json": "telemetry_M1_long-context_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 68.8
+        },
+        "16": {
+          "bench_json": "bench_M1_long-context_16.json",
+          "telemetry_json": "telemetry_M1_long-context_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 50.5
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M2",
+      "model_id": "openai/gpt-oss-20b",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16
+      },
+      "server_log": "server_M2_baseline.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M2_baseline_1.json",
+          "telemetry_json": "telemetry_M2_baseline_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 65.4
+        },
+        "4": {
+          "bench_json": "bench_M2_baseline_4.json",
+          "telemetry_json": "telemetry_M2_baseline_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 33.4
+        },
+        "8": {
+          "bench_json": "bench_M2_baseline_8.json",
+          "telemetry_json": "telemetry_M2_baseline_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 25.4
+        },
+        "16": {
+          "bench_json": "bench_M2_baseline_16.json",
+          "telemetry_json": "telemetry_M2_baseline_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 22.1
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M2",
+      "model_id": "openai/gpt-oss-20b",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8"
+      },
+      "server_log": "server_M2_kv-fp8.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M2_kv-fp8_1.json",
+          "telemetry_json": "telemetry_M2_kv-fp8_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 59.1
+        },
+        "4": {
+          "bench_json": "bench_M2_kv-fp8_4.json",
+          "telemetry_json": "telemetry_M2_kv-fp8_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 32.0
+        },
+        "8": {
+          "bench_json": "bench_M2_kv-fp8_8.json",
+          "telemetry_json": "telemetry_M2_kv-fp8_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 25.9
+        },
+        "16": {
+          "bench_json": "bench_M2_kv-fp8_16.json",
+          "telemetry_json": "telemetry_M2_kv-fp8_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 21.5
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M3",
+      "model_id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16
+      },
+      "server_log": "server_M3_baseline.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M3_baseline_1.json",
+          "telemetry_json": "telemetry_M3_baseline_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 363.0
+        },
+        "4": {
+          "bench_json": "bench_M3_baseline_4.json",
+          "telemetry_json": "telemetry_M3_baseline_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 127.2
+        },
+        "8": {
+          "bench_json": "bench_M3_baseline_8.json",
+          "telemetry_json": "telemetry_M3_baseline_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 85.6
+        },
+        "16": {
+          "bench_json": "bench_M3_baseline_16.json",
+          "telemetry_json": "telemetry_M3_baseline_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 65.7
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M3",
+      "model_id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8"
+      },
+      "server_log": "server_M3_kv-fp8.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M3_kv-fp8_1.json",
+          "telemetry_json": "telemetry_M3_kv-fp8_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 361.5
+        },
+        "4": {
+          "bench_json": "bench_M3_kv-fp8_4.json",
+          "telemetry_json": "telemetry_M3_kv-fp8_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 126.1
+        },
+        "8": {
+          "bench_json": "bench_M3_kv-fp8_8.json",
+          "telemetry_json": "telemetry_M3_kv-fp8_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 84.5
+        },
+        "16": {
+          "bench_json": "bench_M3_kv-fp8_16.json",
+          "telemetry_json": "telemetry_M3_kv-fp8_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 70.3
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M4",
+      "model_id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16
+      },
+      "server_log": "server_M4_baseline.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M4_baseline_1.json",
+          "telemetry_json": "telemetry_M4_baseline_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 128.0
+        },
+        "4": {
+          "bench_json": "bench_M4_baseline_4.json",
+          "telemetry_json": "telemetry_M4_baseline_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 55.2
+        },
+        "8": {
+          "bench_json": "bench_M4_baseline_8.json",
+          "telemetry_json": "telemetry_M4_baseline_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 41.9
+        },
+        "16": {
+          "bench_json": "bench_M4_baseline_16.json",
+          "telemetry_json": "telemetry_M4_baseline_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 33.2
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    },
+    {
+      "model": "M4",
+      "model_id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8"
+      },
+      "server_log": "server_M4_kv-fp8.log",
+      "concurrency_results": {
+        "1": {
+          "bench_json": "bench_M4_kv-fp8_1.json",
+          "telemetry_json": "telemetry_M4_kv-fp8_1.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 127.7
+        },
+        "4": {
+          "bench_json": "bench_M4_kv-fp8_4.json",
+          "telemetry_json": "telemetry_M4_kv-fp8_4.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 55.0
+        },
+        "8": {
+          "bench_json": "bench_M4_kv-fp8_8.json",
+          "telemetry_json": "telemetry_M4_kv-fp8_8.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 41.5
+        },
+        "16": {
+          "bench_json": "bench_M4_kv-fp8_16.json",
+          "telemetry_json": "telemetry_M4_kv-fp8_16.json",
+          "status": "ok",
+          "reason": null,
+          "wall_time_s": 33.2
+        }
+      },
+      "weights_removed": false,
+      "gpu": "NVIDIA L40"
+    }
+  ]
+}

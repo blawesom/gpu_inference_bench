@@ -1,0 +1,24 @@
+{
+  "vendor": "amd",
+  "gpu": "0x7551",
+  "gpu_index_in_container": 1,
+  "vram_total_gb": 31.9,
+  "driver": "7.2.2",
+  "stack": {
+    "cuda": null,
+    "rocm": "7.2.53211",
+    "xpu": null
+  },
+  "os": "CachyOS",
+  "kernel": "7.2.2-1-cachyos",
+  "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+  "cpu_cores": 16,
+  "ram_gb": 31.0,
+  "gpu_kernel_modules": [
+    "amdgpu"
+  ],
+  "docker_version": "29.7.2",
+  "image": "vllm/vllm-openai-rocm:v0.28.0",
+  "image_id": "sha256:e0a3b2bd3fe7ec563916c3a5d949898d133458c18d6b2f460c906885cfb32032",
+  "vllm_version": "0.28.0+rocm723"
+}

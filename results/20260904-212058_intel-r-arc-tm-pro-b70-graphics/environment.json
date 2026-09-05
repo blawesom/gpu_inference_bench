@@ -1,0 +1,25 @@
+{
+  "vendor": "intel",
+  "gpu": "Intel(R) Arc(TM) Pro B70 Graphics",
+  "gpu_index_in_container": 0,
+  "vram_total_gb": 31.9,
+  "driver": null,
+  "stack": {
+    "cuda": null,
+    "rocm": null,
+    "xpu": null
+  },
+  "os": "CachyOS",
+  "kernel": "7.2.3-1-cachyos",
+  "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+  "cpu_cores": 16,
+  "ram_gb": 31.0,
+  "gpu_kernel_modules": [
+    "amdgpu",
+    "xe"
+  ],
+  "docker_version": "29.7.2",
+  "image": "vllm/vllm-openai-xpu:v0.28.0",
+  "image_id": "sha256:4756b66a077627133cee653b551f6f5eaa1b9a981b5eea13edd33fcd3b0d3ca3",
+  "vllm_version": "0.28.0+xpu"
+}
