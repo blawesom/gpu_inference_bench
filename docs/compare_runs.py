@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""One-off cross-system comparison of gpu_inference_bench run directories.
+"""Cross-system comparison of gpu_inference_bench run directories.
 
-Reads report.json + environment.json from each run dir, writes
-results/cross-system-comparison.md.
+Reads report.json + environment.json from each run dir under results/ and
+writes docs/cross-system-comparison.md (or --out).
+
+Usage: python3 docs/compare_runs.py [repo] [--out PATH]
 """
 import json
 import sys
@@ -302,12 +304,15 @@ def build() -> str:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        print("usage: compare_runs.py <repo>", file=sys.stderr)
-        sys.exit(1)
-    repo = Path(sys.argv[1]).resolve()
+    import argparse
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("repo", nargs="?", default=".", help="repo root (default: cwd)")
+    p.add_argument("--out", default=None,
+                   help="output path (default: <repo>/docs/cross-system-comparison.md)")
+    args = p.parse_args()
+    repo = Path(args.repo).resolve()
     load(repo)
-    out = repo / "results" / "cross-system-comparison.md"
+    out = Path(args.out).resolve() if args.out else repo / "docs" / "cross-system-comparison.md"
     out.write_text(build())
     print(f"wrote {out}")
 
