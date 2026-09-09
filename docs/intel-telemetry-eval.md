@@ -2,12 +2,34 @@
 
 > **Goal:** first-class thermal + power telemetry on the Intel (xe, Arc B70/B580) target, on par with NVIDIA/AMD (which already report power today).
 
-**Status:** Tier 1 (xe-sysfs + xpu-smi) implemented in `telemetry.py`. A
-read-only spike probe now exists at `container/intel_telemetry_probe.py` so
-the §7 target-box check is a one-liner. **The §7 spike on the actual B70 box
-is still the open item** — run the probe on the box (and inside the vLLM XPU
-container) to pin down whether the kernel exposes power via xe-hwmon or
-xpu-smi. Until then the comparison keeps the 230 W assumed-TDP floor.
+**Status: RESOLVED (2026-09-08, after the B70 spike).** The target-box spike
+settled every open question, and the result overturned the Tier-2 premise:
+
+1. **Host (kernel 7.2.3-cachyos):** the `xe` hwmon device exposes **temperature
+   only — no power attribute** for the Arc Pro B70. Tier-1 sysfs power is
+   unavailable on this kernel.
+2. **Container (`vllm/vllm-openai-xpu:v0.28.0`):** the image **already ships
+   xpu-smi 2.1.0.20250225** at `/usr/bin/xpu-smi` (same build as the host). It
+   was the assumption "xpu-smi not always in the image" that was wrong — not
+   the image. With bench.sh's DRI passthrough it discovers the B70 and
+   `power.draw` returns live wattages (23 W idle in the spike).
+3. **The real blocker was the CLI syntax.** `telemetry.py` called
+   `xpu-smi dump -d 0 -m <metrics>` (the pre-2.1 flag set); xpu-smi 2.1.0
+   rejects `-d`/`-m` outright (`arguments were not expected: power -m`), so
+   **every Intel sample silently returned nothing — including the Sept-4
+   reference run (zero telemetry files, now flagged `telemetry-missing`).**
+4. **Fix:** `telemetry.py` and `intel_telemetry_probe.py` now use the 2.1.0
+   JSON API — `xpu-smi dump --device 0 --metrics utilization.gpu,memory.used,
+   temperature.gpu,power.draw,clocks.current.graphics -j --number 2
+   --interval 1` — and parse the JSON lines (values are strings, `"N/A"` when
+   a counter has no delta; the last sample line is used). `--number 2` keeps
+   the delta-based counters (`power.draw`, `utilization.gpu`) valid at ~0.5 Hz.
+
+The Tier-2 wrapper image (`docker/Dockerfile.xpu-tools`, `bench.sh
+--build-xpu-tools`) is **no longer needed** for this image — kept only as a
+fallback for images that lack xpu-smi. Note: the Intel oneAPI apt channel was
+unreachable from the B70 network during the spike (GPG key fetch failed), so
+the wrapper build is unverified there regardless.
 
 The report now (a) displays the telemetry source per metric
 (`report.md` Environment block, `environment.json → telemetry_metrics`) and
@@ -21,18 +43,24 @@ ship unnoticed.
 
 | Metric | Source | Availability | In report? |
 |---|---|---|---|
-| Memory | `xpu-smi dump -m mem_used` | Best-effort (xpu-smi not always in image) | ✅ peak/avg |
-| Utilization | `xpu-smi dump -m gpu_utilization` | Best-effort | ✅ avg/peak |
-| **Power** | — | ❌ Always null — the requested metric list (`gpu_utilization,mem_used`) does not include power, and the xe sysfs path is not used | ❌ "n/a" |
-| **Temperature** | — | ❌ Not collected at all | ❌ No column |
-| **Frequency** | — | ❌ Not collected | ❌ No column |
+| Memory | `xpu-smi dump --metrics memory.used -j` | ✅ in stock image (2.1.0) | ✅ peak/avg |
+| Utilization | `xpu-smi dump --metrics utilization.gpu -j` | ✅ (N/A on delta-less idle samples) | ✅ avg/peak |
+| **Power** | `xpu-smi dump --metrics power.draw -j` (card-domain W) | ✅ in stock image; xe-hwmon has no power on kernel 7.2.3 | ✅ avg/peak + `energy_j` |
+| **Temperature** | `xpu-smi dump --metrics temperature.gpu -j` (xe hwmon fallback) | ✅ | ✅ column |
+| **Frequency** | `xpu-smi dump --metrics clocks.current.graphics -j` (xe sysfs fallback) | ✅ | ✅ column |
 
-### Why these gaps exist
+### Why the gap existed (root cause, 2026-09-08)
 
-1. **`xpu-smi` metrics list is minimal.** `telemetry.py` requests only `gpu_utilization,mem_used` (line 183). Power/temperature/frequency aren't requested.
-2. **`intel_gpu_top` is i915-only** — it cannot see xe devices. Arc B70 (BMG/Xe2) runs on the `xe` driver, so this tool is irrelevant.
-3. **The xe driver's own sysfs sources are unused.** The kernel exposes frequency since 6.9, and thermal/power via hwmon on recent kernels — but the container reads nothing from sysfs.
-4. **The vLLM XPU image (`vllm/vllm-openai-xpu`) carries the Level Zero runtime + PyTorch XPU**, not full diagnostic tools. The repo notes xpu-smi is "not always in the image."
+1. **Wrong CLI flags for the shipped xpu-smi.** The stock image ships
+   xpu-smi 2.1.0.20250225, whose `dump` subcommand takes `--device`/`--metrics`
+   (long flags, JSON via `-j`) — **not** the legacy `-d`/`-m` the sampler used.
+   2.1.0 rejects the old call outright, so every Intel sample was null — the
+   Sept-4 reference run shipped with zero telemetry files (now flagged
+   `telemetry-missing`).
+2. **xe hwmon has no power on this kernel.** Kernel 7.2.3's `xe` hwmon device
+   exposes `temp1_input` but no `power1_input`/`power1_average` for the B70,
+   so the sysfs path cannot provide power; xpu-smi is the source.
+3. **`intel_gpu_top` is i915-only** — irrelevant for xe/Arc.
 
 ---
 
@@ -41,8 +69,8 @@ ship unnoticed.
 | Source | Temp | Power | Freq | Util | Mem | In container | Kernel req. | Privileges |
 |---|---|---|---|---|---|---|---|---|
 | **xe sysfs** `*/device/*_freq_mhz` | – | – | ✅ | – | – | Read-only `/sys` (not masked) | xe ≥6.9 | none |
-| **xe hwmon** `*/hwmon*/{temp1_input,power1_input}` | ✅ | ✅ | – | – | – | Read-only `/sys` (not masked) | xe + hwmon driver | none |
-| **xpu-smi** (XPU-SMI-Lib) | ✅ (verify) | ✅ (verify) | ✅ (verify) | ✅ | ✅ | Tool must be present/installed | Varies by version | root (for libze access) |
+| **xe hwmon** `*/hwmon*/{temp1_input,power1_input}` | ✅ | ❌ on kernel 7.2.3 (B70: temp attr only) | – | – | – | Read-only `/sys` (not masked) | xe + hwmon driver | none |
+| **xpu-smi** (XPU-SMI-Lib) | ✅ verified | ✅ verified (`power.draw`, card-domain W) | ✅ verified | ✅ | ✅ | **in stock vLLM XPU image** (2.1.0) + DRI passthrough | xe | render/video groups (bench.sh) |
 | intel_gpu_top | – | – | ✅ i915 | ✅ i915 | ✅ i915 | Not in image | i915 only | none |
 | Level Zero / torch.xpu | – | – | – | – | ✅ mem only | In image | – | none |
 | CPU RAPL | CPU pkg W | CPU pkg W | – | – | – | `/powercap` masked by Docker | intel_pch_thermal/RAPL | bind-mount to unmask |
@@ -61,7 +89,7 @@ ship unnoticed.
 | `/sys/class/hwmon` visible | ✅ Default | Not masked; contains the xe hwmon device (temp + power) |
 | New cgroup devices needed? | ❌ No | sysfs reads are unprivileged |
 | New capabilities needed? | ❌ No | no ptrace, no perf_event |
-| xpu-smi needed in container? | See Option A/B/C | Only for Tier 2 (fallback); Tier 1 uses sysfs |
+| xpu-smi needed in container? | ✅ In stock image | 2.1.0 shipped in `vllm/vllm-openai-xpu:v0.28.0`; wrapper image only for images that lack it |
 | CPU RAPL needed? | ❌ Optional | Masked by default → needs a bind mount to unmask |
 
 ---
@@ -200,34 +228,24 @@ A second minimal container (e.g., `ubuntu:24.04` + xpu-smi) with the same DRI mo
 
 **Risk:** low — pure file reads; degrades gracefully; no new runtime dependency.
 
-### Tier 2: opt-in wrapper image (**implemented** — `docker/Dockerfile.xpu-tools`)
+### Tier 2: opt-in wrapper image (**not needed — superseded by the spike**)
 
-Triggered by the actual B70 spike: kernel 7.2.3's xe hwmon exposes
-**temperature but no power attribute** for the Arc Pro B70, and the official
-`vllm/vllm-openai-xpu:0.28.0` image ships **no xpu-smi** — so the container
-had no GPU power source at all. xpu-smi is the only power source for this
-card.
+The B70 spike (2026-09-08) showed the stock `vllm/vllm-openai-xpu:0.28.0`
+image **already contains a working xpu-smi 2.1.0** — the Tier-2 premise ("
+image ships no xpu-smi") was wrong. No wrapper image is required: run
+`./bench.sh --vendor intel` with the stock image and the fixed
+`telemetry.py` gets power.
 
-Implementation:
-- `docker/Dockerfile.xpu-tools` — `FROM` the official XPU image, adds
-  `intel-xpu-smi` from Intel's oneAPI apt channel, and ends with a hard check
-  (`command -v xpu-smi && xpu-smi --version`) so a bad package/channel fails
-  the build instead of shipping a silent no-power image. Fallback recipe
-  (XPU-SMI-Lib prebuilt / GitHub) is in the file header.
-- `bench.sh --build-xpu-tools` (intel only, default off): builds
-  `gpu-bench/vllm-xpu-tools:<vllm-version>` on first use, reuses it after;
-  the built image ID lands in `environment.json` via the existing
-  `IMAGE`/`IMAGE_DIGEST` fields (reproducible). `--image` still wins.
-
-Usage on the B70 box:
-```bash
-./bench.sh --vendor intel --build-xpu-tools --quick   # build image, smoke-test telemetry
-python3 container/intel_telemetry_probe.py --out intel-spike-container.json  # in-container
-```
-Then a full T0 run: `./bench.sh --vendor intel --build-xpu-tools`.
-
-**Alternative:** runtime `apt-get` (Option B) remains a documented manual
-escape hatch if a prebuilt wrapper is unwanted.
+What remains (fallback only):
+- `docker/Dockerfile.xpu-tools` + `bench.sh --build-xpu-tools` (intel only,
+  default off) — builds `gpu-bench/vllm-xpu-tools:<ver>` = official image +
+  `intel-xpu-smi` from Intel's oneAPI apt channel, with a hard build-time
+  check. Use only if a future vLLM image drops the tool.
+- **Caveat from the spike:** the oneAPI apt channel was unreachable from the
+  B70 network (GPG key fetch → 403), so the build is unverified there. The
+  XPU-SMI-Lib-from-GitHub fallback is in the Dockerfile header.
+- `container/test_xpu_smi.sh` — fish-safe one-shot test of xpu-smi + DRI
+  passthrough inside any vLLM XPU image (prints the exact docker argv).
 
 ### Tier 3: optional CPU system metrics
 
@@ -559,25 +577,24 @@ def aggregate(self, samples: list[dict]) -> Optional[dict]:
 | Action | When | Effort | Risk |
 |---|---|---|---|
 | **Tier 1: sysfs sampler** (xe-sysfs + xpu-smi fallback) | **done** — implemented in `telemetry.py`; report displays source per metric; `telemetry-missing` flag for zero-telem runs | — | Low |
-| **Spike on B70** (run `container/intel_telemetry_probe.py`) | **pending** — the probe script exists; run on the B70 box (host + in-container) to pin down whether the target kernel exposes power | 10 min | None |
-| **Tier 2: wrapper image** (`docker/Dockerfile.xpu-tools` + `--build-xpu-tools`) | **implemented** — pending build on the B70 box (apt channel not verifiable from this dev machine; build has a hard xpu-smi check) | — | Low |
+| **Spike on B70** (probe host + in-container) | **done 2026-09-08** — xe hwmon: temp only, no power (kernel 7.2.3); stock image **has** xpu-smi 2.1.0; `power.draw` verified live in-container with DRI passthrough | — | None |
+| **xpu-smi 2.1.0 API fix** (`telemetry.py` + probe: `--device/--metrics -j --number 2 --interval 1`, JSON-line parsing) | **done** — pending a `--quick` smoke run on the B70 box for end-to-end confirmation | — | Low |
+| **Tier 2: wrapper image** (`docker/Dockerfile.xpu-tools` + `--build-xpu-tools`) | **not needed** — stock image ships xpu-smi; kept as fallback (apt channel unreachable on B70 network, build unverified) | — | Low |
 | **Tier 3: CPU RAPL** (optional system energy) | Post-launch polish | Low | Low |
 | Reject: sidecar (D), host-side (E), runtime install (B alone) | — | — | — |
 
-Run the spike probe on the B70 box:
+Remaining step on the B70 box:
 ```bash
-python3 container/intel_telemetry_probe.py --out intel-spike-host.json
+git pull
+./bench.sh --vendor intel --quick      # stock image, no --build-xpu-tools
+# then check results/<run>/telemetry_M1_baseline_1.json for non-null power_w
+# and report.md → Data quality for the absence of 'telemetry-missing'
 ```
-Then inside the vLLM XPU container:
-```bash
-python3 container/intel_telemetry_probe.py --out intel-spike-container.json
-```
-Record the `verdict.power_available` field. If true, run the T0 Intel reference
-as planned (power numbers will be measured, not TDP-assumed). If false, enable
-Tier 2 before any energy ranking.
+Once that passes, run the full T0 Intel reference with the stock image —
+power will be measured (xpu-smi `power.draw`, card-domain watts), the 230 W
+assumed-TDP floor can be dropped, and GPU energy rankings become definitive.
 
-After the spike, implement Tier 1. If temperature/power are missing on the target kernel, propose Tier 2.
-
----
-
-*Draft — awaiting target-box spike results before implementation.*
+Note on the Sept-4 reference run: it predates this fix and produced **zero
+telemetry** (the old `-d -m` syntax failed silently on every sample); it is
+flagged `telemetry-missing` in its report. It remains valid for throughput/
+latency; its (absent) GPU power figures must not be cited.

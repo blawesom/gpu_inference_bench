@@ -43,12 +43,13 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
   - **NVIDIA**: driver + `nvidia-container-toolkit`
   - **AMD**: ROCm kernel driver (`amdgpu` with KFD)
   - **Intel**: `xe` kernel module (Arc A/B dGPUs, e.g. Arc B70) on the host;
-    the Level Zero runtime ships in the vLLM XPU image. `xpu-smi` is optional
-    (host auto-detect only — `xe` module or lspci suffices). GPU power/temperature
-    telemetry reads the xe driver's sysfs directly (no extra tools needed);
-    temperature/power additionally require a recent kernel with the xe hwmon
-    driver. The run records which telemetry sources are available in
-    `environment.json` (`telemetry_metrics`)
+    the vLLM XPU image ships the Level Zero runtime **plus `xpu-smi`**
+    (2.1.0). GPU telemetry reads xe sysfs for temperature (power may be absent
+    on some kernels — the B70 on kernel 7.2.3 exposes temp but **no power** via
+    xe-hwmon) and xpu-smi for power/utilization/mem/frequency. The run records
+    which telemetry sources are available in `environment.json`
+    (`telemetry_metrics`); runs that produce zero telemetry samples are flagged
+    `telemetry-missing` in the report.
 - Disk: ~100 GB free on the first run (image ~25–35 GB + all model weights ~80 GB
   kept for re-runs).  With `--delete-weights` only ~65 GB is needed (one model at a
   time). `bench.sh` gates this automatically (`--force` to override; `--cache-dir`

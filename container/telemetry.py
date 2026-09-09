@@ -28,6 +28,7 @@ Design notes:
 from __future__ import annotations
 
 import glob
+import json
 import os
 import re
 import subprocess
@@ -124,10 +125,8 @@ class TelemetrySampler:
         if self.vendor == "amd":
             self._query_amd_totals()
         # Intel: cache the xe sysfs discovery (paths are stable for the
-        # container's lifetime), the xpu-smi metric list that worked, and
-        # which source produced each metric.
+        # container's lifetime) and which source produced each metric.
         self._xe_cache: Optional[dict] = None
-        self._xpu_smi_metrics: Optional[str] = None
         self._intel_metric_sources: dict = {}
 
     # ── public API ──────────────────────────────────────────────────────────
@@ -416,9 +415,15 @@ class TelemetrySampler:
             return result
         return None
 
-    _XPU_SMI_FULL_METRICS = ("gpu_utilization,mem_used,temperature,"
-                             "power,gpu_frequency")
-    _XPU_SMI_LEGACY_METRICS = "gpu_utilization,mem_used"
+    # xpu-smi >= 2.1 (the vllm/vllm-openai-xpu image ships 2.1.0):
+    #   dump --device <idx> --metrics <fields> -j --number 2 --interval 1
+    # One JSON object per line: {"timestamp":..., "device":0,
+    #  "metrics": {field: "value"|"N/A"}}. Delta-based metrics (power.draw,
+    #  utilization.gpu) need the internal sampling interval to compute a
+    #  counter delta, hence --number 2 with the last line taken. ~2 s per
+    #  call: the 1 Hz loop degrades to ~0.5 Hz effective, fine for averages.
+    _XPU_SMI_FIELDS = ("utilization.gpu,memory.used,temperature.gpu,"
+                       "power.draw,clocks.current.graphics")
 
     def _xpu_smi_fill(self, result: dict, src: dict) -> None:
         """Fill whatever xpu-smi reports, never overwriting values sysfs
@@ -426,60 +431,70 @@ class TelemetrySampler:
         idx = str(self.gpu_index if self.gpu_index is not None else 0)
         env = {k: v for k, v in os.environ.items()
                if k not in ("ONEAPI_DEVICE_SELECTOR",)}
-        # Extended metric set first; older builds can reject unknown metric
-        # names for the whole dump, so fall back to the legacy pair (and
-        # remember which list worked).
-        metrics = (self._xpu_smi_metrics or self._XPU_SMI_FULL_METRICS)
-        out = _run(["xpu-smi", "dump", "-d", idx, "-m", metrics],
+        out = _run(["xpu-smi", "dump", "--device", idx,
+                    "--metrics", self._XPU_SMI_FIELDS, "-j",
+                    "--number", "2", "--interval", "1"],
                    env=env, timeout=10.0)
-        if not out and metrics != self._XPU_SMI_LEGACY_METRICS:
-            out = _run(["xpu-smi", "dump", "-d", idx, "-m",
-                        self._XPU_SMI_LEGACY_METRICS], env=env, timeout=10.0)
-            if out:
-                self._xpu_smi_metrics = self._XPU_SMI_LEGACY_METRICS
-        elif out:
-            self._xpu_smi_metrics = metrics
         if not out:
             return
-        m = re.search(r"gpu_utilization[\"':\s]+(\d+(?:\.\d+)?)", out)
-        if m and result["util_pct"] is None:
-            result["util_pct"] = float(m.group(1))
-            src["utilization"] = "xpu-smi"
-        m_mem = re.search(r"mem_used[\"':\s]+(\d+(?:\.\d+)?)", out)
-        if m_mem and result["mem_used_gb"] is None:
-            v = float(m_mem.group(1))
-            # Unit heuristic: xpu-smi reports bytes for large
-            # values, MiB in some builds — distinguish by magnitude
-            # (a fully used 16 GB card is ~1.7e10 bytes vs ~1.6e4 MiB).
-            result["mem_used_gb"] = round(v / 1024 ** 3, 2) if v >= 10 ** 8 \
-                else round(v / 1024.0, 2)
-            src["memory"] = "xpu-smi"
-        # Fallback metrics (only used when sysfs did not provide them).
+        # JSON lines — take the last parseable sample (the first sample of a
+        # fresh process may carry "N/A" for delta-based counters).
+        data = None
+        for line in reversed([l for l in out.splitlines() if l.strip()]):
+            try:
+                data = json.loads(line)
+                break
+            except ValueError:
+                continue
+        if not isinstance(data, dict):
+            return
+        m = data.get("metrics")
+        if not isinstance(m, dict):
+            # Tolerance for other JSON shapes: pick known field names from
+            # wherever they sit in the object.
+            m = {k: v for k, v in data.items() if isinstance(k, str) and "." in k}
+
+        def _val(key: str) -> Optional[float]:
+            v = m.get(key)
+            if isinstance(v, bool):
+                return None
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str):
+                if v == "N/A":
+                    return None
+                try:
+                    return float(v)
+                except ValueError:
+                    return None
+            return None
+
+        if result["util_pct"] is None:
+            v = _val("utilization.gpu")
+            if v is not None and 0.0 <= v <= 100.0:
+                result["util_pct"] = v
+                src["utilization"] = "xpu-smi"
+        if result["mem_used_gb"] is None:
+            v = _val("memory.used")
+            if v is not None and v >= 0:
+                # memory.used is MiB per the 2.1.0 field spec.
+                result["mem_used_gb"] = round(v / 1024.0, 2)
+                src["memory"] = "xpu-smi"
         if result["temp_c"] is None:
-            m_t = re.search(
-                r"(?<![\w])(?:gpu_)?temperature[\"':\s]+(-?\d+(?:\.\d+)?)",
-                out)
-            if m_t:
-                v = float(m_t.group(1))
-                if 5.0 <= v <= 125.0:
-                    result["temp_c"] = v
-                    src["temperature"] = "xpu-smi"
+            v = _val("temperature.gpu")
+            if v is not None and 5.0 <= v <= 125.0:
+                result["temp_c"] = v
+                src["temperature"] = "xpu-smi"
         if result["power_w"] is None:
-            m_p = re.search(
-                r"(?<![\w])(?:gpu_)?power[\"':\s]+(-?\d+(?:\.\d+)?)", out)
-            if m_p:
-                v = float(m_p.group(1))
-                if 0.1 <= v <= 1000.0:
-                    result["power_w"] = v
-                    src["power"] = "xpu-smi"
+            v = _val("power.draw")
+            if v is not None and 0.1 <= v <= 1000.0:
+                result["power_w"] = v
+                src["power"] = "xpu-smi"
         if result["freq_mhz"] is None:
-            m_f = re.search(
-                r"(?<![\w])(?:gpu_)?frequency[\"':\s]+(\d+(?:\.\d+)?)", out)
-            if m_f:
-                v = float(m_f.group(1))
-                if 100.0 <= v <= 10000.0:
-                    result["freq_mhz"] = v
-                    src["frequency"] = "xpu-smi"
+            v = _val("clocks.current.graphics")
+            if v is not None and 100.0 <= v <= 10000.0:
+                result["freq_mhz"] = v
+                src["frequency"] = "xpu-smi"
 
     # ── environment probe (used by run_matrix.collect_environment) ────────
     def probe(self) -> Optional[dict]:

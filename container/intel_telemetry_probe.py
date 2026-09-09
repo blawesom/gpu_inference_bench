@@ -212,14 +212,28 @@ def probe_tools():
         d["discovery"] = _run(["xpu-smi", "discovery"], timeout=20.0)[:1200] or None
         # Full metric set — capture stderr too: a null dump with an error on
         # stderr usually means a permissions/group problem, not "no metric".
-        ext = (["xpu-smi", "dump", "-d", "0", "-m",
-                "gpu_utilization,mem_used,temperature,power,gpu_frequency"])
-        d["dump_d0_extended"], d["dump_d0_extended_stderr"] = _run_both(ext, 25.0)
+        # xpu-smi >= 2.1 syntax (JSON lines); fall back to the legacy
+        # -d/-m text syntax for older builds (other hosts).
+        d["dump_d0_extended"], d["dump_d0_extended_stderr"] = _run_both(
+            ["xpu-smi", "dump", "--device", "0",
+             "--metrics",
+             "utilization.gpu,memory.used,temperature.gpu,power.draw,"
+             "clocks.current.graphics", "-j", "--number", "2",
+             "--interval", "1"], 25.0)
+        if not d["dump_d0_extended"]:
+            d["dump_d0_extended"], d["dump_d0_extended_stderr"] = _run_both(
+                ["xpu-smi", "dump", "-d", "0", "-m",
+                 "gpu_utilization,mem_used,temperature,power,gpu_frequency"],
+                25.0)
         d["dump_d0_extended"] = d["dump_d0_extended"] or None
         d["dump_d0_extended_stderr"] = (d["dump_d0_extended_stderr"] or "")[:600] or None
         # Power alone — isolates whether the 'power' metric is the problem.
         d["dump_d0_power"], d["dump_d0_power_stderr"] = _run_both(
-            ["xpu-smi", "dump", "-d", "0", "-m", "power"], 25.0)
+            ["xpu-smi", "dump", "--device", "0", "--metrics", "power.draw",
+             "-j", "--number", "2", "--interval", "1"], 25.0)
+        if not d["dump_d0_power"]:
+            d["dump_d0_power"], d["dump_d0_power_stderr"] = _run_both(
+                ["xpu-smi", "dump", "-d", "0", "-m", "power"], 25.0)
         d["dump_d0_power"] = d["dump_d0_power"] or None
         d["dump_d0_power_stderr"] = (d["dump_d0_power_stderr"] or "")[:600] or None
         detail["xpu-smi"] = d
@@ -268,12 +282,32 @@ def probe_live_sampler(gpu_index=None, seconds=5.0):
 # ── verdict ─────────────────────────────────────────────────────────────────
 def _xpu_smi_power_works(tools: dict) -> bool:
     """True if a power-only (or extended) xpu-smi dump returned a number.
-    Prefers the dedicated 'power' dump, falls back to the extended dump."""
+    Handles both the >= 2.1 JSON-line output (power.draw) and the legacy
+    text output. Prefers the dedicated power dump, falls back to extended."""
     det = (tools.get("detail") or {}).get("xpu-smi") or {}
     for key in ("dump_d0_power", "dump_d0_extended"):
         dump = det.get(key)
         if not dump:
             continue
+        # 2.1.0 JSON lines: {..., "metrics": {"power.draw": "23.35"}}
+        for line in reversed([l for l in dump.splitlines() if l.strip()]):
+            try:
+                data = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(data, dict):
+                continue
+            m = data.get("metrics")
+            if isinstance(m, dict):
+                v = m.get("power.draw")
+                if v not in (None, "N/A"):
+                    try:
+                        if float(v) > 0:
+                            return True
+                    except (TypeError, ValueError):
+                        pass
+            break
+        # Legacy text output (xpu-smi < 2.1).
         m = re.search(r"(?<![\w])power[\"':\s]+(\d+(?:\.\d+)?)", dump, re.I)
         if m and float(m.group(1)) > 0:
             return True
