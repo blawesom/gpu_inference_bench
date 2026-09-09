@@ -1,7 +1,7 @@
 {
   "schema_version": "1.2",
   "run_id": "20260904-212058_intel-r-arc-tm-pro-b70-graphics",
-  "generated_at": "2026-09-09T14:16:27.792641+00:00",
+  "generated_at": "2026-09-09T14:28:20.198244+00:00",
   "environment": {
     "vendor": "intel",
     "gpu": "Intel(R) Arc(TM) Pro B70 Graphics",
@@ -202,6 +202,11 @@
       "cell": null,
       "issue": "power-window-legacy",
       "detail": "power/energy over the FULL bench client window (pre-P1): avg power under-stated, energy/token over-stated \u2014 efficiency figures optimistic"
+    },
+    {
+      "cell": null,
+      "issue": "telemetry-missing",
+      "detail": "OK bench cells but no telemetry JSON files \u2014 the GPU sampler produced zero samples (check the telemetry source / driver. On Intel this usually means missing xe-hwmon + no xpu-smi in the image). Power, temperature, and frequency are unavailable."
     }
   ],
   "rows": [

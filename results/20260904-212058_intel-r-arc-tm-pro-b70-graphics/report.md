@@ -1,6 +1,6 @@
 # GPU Inference Bench Report
 
-**Intel(R) Arc(TM) Pro B70 Graphics** · Run: 20260904-212058_intel-r-arc-tm-pro-b70-graphics · vLLM 0.28.0+xpu · 2026-09-09T14:16:27.792641+00:00
+**Intel(R) Arc(TM) Pro B70 Graphics** · Run: 20260904-212058_intel-r-arc-tm-pro-b70-graphics · vLLM 0.28.0+xpu · 2026-09-09T14:28:20.198244+00:00
 
 | Metric | Value |
 |---|---|
@@ -33,6 +33,8 @@
 | Image | vllm/vllm-openai-xpu:v0.28.0 |
 | Image ID | sha256:4756b66a077627133cee653b551f6f5eaa1b9a981b5eea13edd33fcd3b0d3ca3 |
 | vLLM | 0.28.0+xpu |
+| Telemetry source | n/a |
+| Telemetry probe | n/a |
 
 ## Model Summary (Concurrency = 1)
 
@@ -126,3 +128,4 @@
 | openai/gpt-oss-20b / kv-fp8 C=8 | **output-token-shortfall** | output tokens 1861/12800 (14%) |
 | openai/gpt-oss-20b / kv-fp8 C=16 | **output-token-shortfall** | output tokens 1940/12800 (15%) |
 | run | **power-window-legacy** | power/energy over the FULL bench client window (pre-P1): avg power under-stated, energy/token over-stated — efficiency figures optimistic |
+| run | **telemetry-missing** | OK bench cells but no telemetry JSON files — the GPU sampler produced zero samples (check the telemetry source / driver. On Intel this usually means missing xe-hwmon + no xpu-smi in the image). Power, temperature, and frequency are unavailable. |

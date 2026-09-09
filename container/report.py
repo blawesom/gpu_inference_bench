@@ -108,6 +108,8 @@ ENV_FIELDS = [
     ("image",          "Image"),
     ("image_id",       "Image ID"),
     ("vllm_version",   "vLLM"),
+    ("telemetry_metrics", "Telemetry source"),
+    ("telemetry_probe",  "Telemetry probe"),
 ]
 
 
@@ -376,6 +378,17 @@ def _data_quality(cells: list[dict], out_dir: Path,
                    "detail": "power/energy over the FULL bench client window "
                              "(pre-P1): avg power under-stated, energy/token "
                              "over-stated — efficiency figures optimistic"})
+    # ── P1: telemetry-missing (runs that have bench output but no GPU
+    #    metrics at all — the GPU sampler silently returned nothing) ─────
+    ok_rows = [r for r in rows if r.get("status") == "ok"]
+    if ok_rows and not any(t for t in telems):
+        dq.append({"cell": None, "issue": "telemetry-missing",
+                   "detail": "OK bench cells but no telemetry JSON files — "
+                             "the GPU sampler produced zero samples (check "
+                             "the telemetry source / driver. On Intel this "
+                             "usually means missing xe-hwmon + no xpu-smi in "
+                             "the image). Power, temperature, and frequency "
+                             "are unavailable."})
     return dq
 
 

@@ -1,6 +1,6 @@
 # GPU Inference Bench Report
 
-**0x7551** · Run: 20260903-222650_0x7551 · vLLM 0.28.0+rocm723 · 2026-09-09T14:16:21.882742+00:00
+**0x7551** · Run: 20260903-222650_0x7551 · vLLM 0.28.0+rocm723 · 2026-09-09T14:29:33.018856+00:00
 
 | Metric | Value |
 |---|---|
@@ -33,6 +33,8 @@
 | Image | vllm/vllm-openai-rocm:v0.28.0 |
 | Image ID | sha256:e0a3b2bd3fe7ec563916c3a5d949898d133458c18d6b2f460c906885cfb32032 |
 | vLLM | 0.28.0+rocm723 |
+| Telemetry source | n/a |
+| Telemetry probe | n/a |
 
 ## Model Summary (Concurrency = 1)
 

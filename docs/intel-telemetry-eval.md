@@ -2,11 +2,18 @@
 
 > **Goal:** first-class thermal + power telemetry on the Intel (xe, Arc B70/B580) target, on par with NVIDIA/AMD (which already report power today).
 
-**Status:** evaluation. **Tier 1 (Option A, xe-sysfs sampling) implemented**
-(`telemetry.py` + `run_matrix.py` probe; report.md format unchanged, new
-fields are additive in the per-level `telemetry` objects and in
-`environment.json` → `telemetry_metrics`). Target-box spike (§7) still
-pending.
+**Status:** Tier 1 (xe-sysfs + xpu-smi) implemented in `telemetry.py`. A
+read-only spike probe now exists at `container/intel_telemetry_probe.py` so
+the §7 target-box check is a one-liner. **The §7 spike on the actual B70 box
+is still the open item** — run the probe on the box (and inside the vLLM XPU
+container) to pin down whether the kernel exposes power via xe-hwmon or
+xpu-smi. Until then the comparison keeps the 230 W assumed-TDP floor.
+
+The report now (a) displays the telemetry source per metric
+(`report.md` Environment block, `environment.json → telemetry_metrics`) and
+(b) flags runs that produced zero telemetry samples with a
+`telemetry-missing` data-quality line, so a silent "no power" can no longer
+ship unnoticed.
 
 ---
 
@@ -346,12 +353,32 @@ tail -f results/<latest>/telemetry_M1_baseline_1.json
 
 ### Spike deliverables
 
-After running the above, record:
-- Exact kernel version and which sysfs paths exist
-- Which xpu-smi metrics return data vs. "not supported"
-- The exact `hwmon/name` string for xe
-- Whether `intel_gpu_top` sees anything (should be empty on xe)
-- A sample during `--quick` showing the data is dynamic (not stale)
+A read-only probe now runs all of §7 and emits a structured verdict:
+
+```bash
+# On the B70 host (or inside the vLLM XPU container):
+python3 container/intel_telemetry_probe.py --out intel-spike.json
+```
+
+It reuses `telemetry.py`'s own discovery/parsing logic, so a "power OK"
+verdict here means the real bench run will see power. It reports:
+
+- kernel, xe module version, in-container detection, RAPL visibility
+- every xe card: `cur_freq_mhz` values, render nodes, and the bound xe
+  hwmon device (temp °C + power W sampled)
+- every hwmon device and whether it exposes temp/power attrs
+- xpu-smi / zeinfo / intel_gpu_top presence + a live `xpu-smi dump` of the
+  full metric set (gpu_utilization, mem_used, temperature, power,
+  gpu_frequency)
+- a **live** `TelemetrySampler` run (default 5 s) — the same production code
+  the bench uses — reporting which metrics it captured and from which source
+- a **verdict**: `power_available`, the power sources, and a recommendation
+  (Tier 1 sufficient, or Tier 2 required)
+
+Record the verdict JSON (`intel-spike.json`) in the run record. After the
+spike: if `power_available` is true, run the T0 Intel reference as planned
+and the comparison can drop the 230 W assumed-TDP floor; if false, enable
+Tier 2 (see below) before the run.
 
 ---
 
@@ -518,17 +545,23 @@ def aggregate(self, samples: list[dict]) -> Optional[dict]:
 
 | Action | When | Effort | Risk |
 |---|---|---|---|
-| **Tier 1: sysfs sampler** (code only) | **done** (report.md format unchanged by request — new fields are additive in `telemetry_*.json` / `report.json` telemetry objects + `environment.json.telemetry_metrics`) | Medium (3 files: telemetry.py, run_matrix.py, README) | Low |
-| **Spike on B70** (run the §7 commands) | Before Tier 1 implementation | 30 min | None |
-| **Tier 2: wrapper image build** (`--build-xpu-tools`) | If Tier 1 lacks temp/power on the host kernel | Low (one Dockerfile + bench.sh flag) | Low |
+| **Tier 1: sysfs sampler** (xe-sysfs + xpu-smi fallback) | **done** — implemented in `telemetry.py`; report displays source per metric; `telemetry-missing` flag for zero-telem runs | — | Low |
+| **Spike on B70** (run `container/intel_telemetry_probe.py`) | **pending** — the probe script exists; run on the B70 box (host + in-container) to pin down whether the target kernel exposes power | 10 min | None |
+| **Tier 2: wrapper image build** (`--build-xpu-tools`) | If the spike shows no power from any source | Low (one Dockerfile + bench.sh flag) | Low |
 | **Tier 3: CPU RAPL** (optional system energy) | Post-launch polish | Low | Low |
 | Reject: sidecar (D), host-side (E), runtime install (B alone) | — | — | — |
 
-The spike (§7) should run first on the B70 box to confirm:
-1. Which sysfs paths exist (frequency layout, hwmon presence)
-2. Whether `xpu-smi` is in the vLLM XPU image
-3. Which xpu-smi metrics return data vs. "not supported"
-4. Whether the data is dynamic (tracks load)
+Run the spike probe on the B70 box:
+```bash
+python3 container/intel_telemetry_probe.py --out intel-spike-host.json
+```
+Then inside the vLLM XPU container:
+```bash
+python3 container/intel_telemetry_probe.py --out intel-spike-container.json
+```
+Record the `verdict.power_available` field. If true, run the T0 Intel reference
+as planned (power numbers will be measured, not TDP-assumed). If false, enable
+Tier 2 before any energy ranking.
 
 After the spike, implement Tier 1. If temperature/power are missing on the target kernel, propose Tier 2.
 

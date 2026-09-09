@@ -1,6 +1,6 @@
 # GPU Inference Bench Report
 
-**NVIDIA L40** · Run: 20260905-134350_nvidia-l40 · vLLM 0.28.0 · 2026-09-09T14:16:27.854314+00:00
+**NVIDIA L40** · Run: 20260905-134350_nvidia-l40 · vLLM 0.28.0 · 2026-09-09T14:29:33.086209+00:00
 
 | Metric | Value |
 |---|---|
@@ -33,6 +33,8 @@
 | Image | vllm/vllm-openai:v0.28.0 |
 | Image ID | sha256:61fc8a896b0a4fbbbdc063bc4b0dbc25ce98e02b5050c24aeb7830ac02039b14 |
 | vLLM | 0.28.0 |
+| Telemetry source | n/a |
+| Telemetry probe | n/a |
 
 ## Model Summary (Concurrency = 1)
 

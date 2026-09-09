@@ -630,14 +630,18 @@ def collect_environment(vendor: str, gpu_index: int | None, gpu: str) -> dict:
         if TelemetrySampler is not None:
             try:
                 probe_sampler = TelemetrySampler("intel", gpu_index)
-                if probe_sampler.probe() is not None:
-                    src = probe_sampler.metric_sources()
+                src = probe_sampler.metric_sources()
+                if src:
                     env["telemetry_metrics"] = {
                         m: src.get(m, "none")
                         for m in ("frequency", "temperature", "power",
                                   "utilization", "memory")}
+                else:
+                    env["telemetry_metrics"] = {}
+                    env["telemetry_probe"] = "no-samples"
             except Exception:
-                pass
+                env["telemetry_metrics"] = {}
+                env["telemetry_probe"] = "probe-failed"
 
     cuda, hip = _torch_stack()
     env["stack"]["cuda"] = cuda

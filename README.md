@@ -302,6 +302,15 @@ remains as a **no-op** for backward compatibility.
 - **Prefix caching is explicitly off and verified** (`--no-enable-prefix-caching`)
   — the Sept 3–5 runs had it accidentally ON (config comment only); see the
   Measurement protocol section and the 2026-09-08 review.
+- **Power draw is best-effort on Intel:** the xe-sysfs sampler (frequency
+  always on xe ≥6.9; temperature + power via the xe hwmon driver on recent
+  kernels) is implemented and the report now records the source per metric
+  and flags any run that produces zero telemetry (`telemetry-missing`). On a
+  kernel without the xe hwmon driver and without `xpu-smi` in the image,
+  power is unavailable — the comparison then keeps the 230 W assumed-TDP
+  floor for Intel and defers any definitive energy ranking. Run
+  `python3 container/intel_telemetry_probe.py` on the B70 box to confirm the
+  available sources. See `docs/intel-telemetry-eval.md`.
 - Power draw is best-effort: `null` ("n/a") where no vendor tool or driver
   exposes it (Intel: needs a recent kernel with the xe hwmon driver, or
   xpu-smi in the image).
