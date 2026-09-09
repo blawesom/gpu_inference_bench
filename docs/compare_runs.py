@@ -61,6 +61,28 @@ def row(key, model, config, c):
     return None
 
 
+def row_rankable(r):
+    """A row may enter rankings only if it is ok AND has no
+    output-token-shortfall flag (P0-2). Degraded/partial rows are kept for
+    display but excluded from derived stats."""
+    if not r or r.get("status") != "ok":
+        return False
+    if (r.get("token_check") or {}).get("flag"):
+        return False
+    if r.get("flags") and "output-token-shortfall" in r["flags"]:
+        return False
+    return True
+
+
+def row_has_shortfall(r):
+    """True if the row's token accounting fell below threshold (P0-2)."""
+    if not r:
+        return False
+    if (r.get("token_check") or {}).get("flag"):
+        return True
+    return "output-token-shortfall" in (r.get("flags") or [])
+
+
 def pct(v, best):
     return f"{100.0 * v / best:.0f}%" if best else "n/a"
 
@@ -76,12 +98,14 @@ def gpu_label(e):
 
 def thr_c16(mid, k):
     r = row(k, mid, "baseline", 16)
-    return r["output_throughput"] if r else None
+    if not row_rankable(r):
+        return None
+    return r["output_throughput"]
 
 
 def scale_c1(mid, k):
     r1, r16 = row(k, mid, "baseline", 1), row(k, mid, "baseline", 16)
-    if r1 and r16:
+    if row_rankable(r1) and row_rankable(r16):
         return r16["output_throughput"] / r1["output_throughput"]
     return None
 
@@ -89,28 +113,28 @@ def scale_c1(mid, k):
 def kv_delta(k, mid, c):
     """kv-fp8 vs baseline output throughput, %."""
     a, b = row(k, mid, "baseline", c), row(k, mid, "kv-fp8", c)
-    if a and b:
+    if row_rankable(a) and row_rankable(b):
         return 100.0 * (b["output_throughput"] - a["output_throughput"]) / a["output_throughput"]
     return None
 
 
 def lat_mean(k, field):
-    """Mean of a latency field over all ok baseline cells (all models, C=1..16)."""
+    """Mean of a latency field over all rankable baseline cells."""
     vals = []
     for _, mid, _ in MODEL_ORDER:
         for c in CS:
             r = row(k, mid, "baseline", c)
-            if r and r.get(field) is not None:
+            if row_rankable(r) and r.get(field) is not None:
                 vals.append(r[field])
     return mean(vals)
 
 
 def worst_cell(field):
-    """(value, key, row) of the largest baseline-cell value for a latency field."""
+    """(value, key, row) of the largest rankable baseline-cell value."""
     best_v, out = None, None
     for k, _, _ in SYSTEMS:
         for r in data[k]["report"]["rows"]:
-            if r["config"] != "baseline" or r["status"] != "ok":
+            if r["config"] != "baseline" or not row_rankable(r):
                 continue
             v = r.get(field)
             if v is not None and (best_v is None or v > best_v):
@@ -121,7 +145,7 @@ def worst_cell(field):
 def eff_cell(k, mid, cfg):
     """(tok/s per watt, (watts, assumed)) at C=16; Intel falls back to TDP."""
     r = row(k, mid, cfg, 16)
-    if not r:
+    if not row_rankable(r):
         return None
     p = (r.get("telemetry") or {}).get("power_avg_w")
     assumed = False
@@ -150,11 +174,18 @@ def build() -> str:
     c16 = {mid: {k: v for k, v in
                  ((k, thr_c16(mid, k)) for k in keys) if v is not None}
            for _, mid, _ in MODEL_ORDER}
+    # c16_raw: every ok row (incl. P0-flagged) for display with † markers.
+    c16_raw = {mid: {k: row(k, mid, "baseline", 16)
+                     for k in keys if row(k, mid, "baseline", 16)}
+               for _, mid, _ in MODEL_ORDER}
+    excluded_models = [slot_of(mid) for mid in c16
+                       if not c16[mid] and mid in c16_raw and any(c16_raw[mid])]
     leader = {}
     for mid, m in c16.items():
         if m:
             leader[mid] = max(m, key=m.get)
-    lead_all = len(set(leader.values())) == 1 and len(leader) == len(MODEL_ORDER)
+    lead_all = (len(set(leader.values())) == 1 and len(leader)
+                == len(MODEL_ORDER) - len(excluded_models))
 
     share = {k: mean([m[k] / max(m.values()) for m in c16.values() if k in m])
              for k in keys}
@@ -183,7 +214,9 @@ def build() -> str:
                      if lat[m][k][0] and lat[m][k][1]]) for k in keys}
 
     ttft16 = {k: mean([(row(k, mid, "baseline", 16) or {}).get("ttft_p50_ms")
-                       for _, mid, _ in MODEL_ORDER]) for k in keys}
+                       for _, mid, _ in MODEL_ORDER
+                       if row_rankable(row(k, mid, "baseline", 16))])
+              for k in keys}
 
     itl_worst_v, itl_worst = worst_cell("itl_p99_ms")
 
@@ -213,10 +246,12 @@ def build() -> str:
     # ── executive summary ──────────────────────────────────────────────────
     top, second, third = sorted(keys, key=lambda k: -share[k])
     L.append("## Executive summary\n")
-    peak = max(max(m.values()) for m in c16.values())
+    peak = max(max(m.values()) for m in c16.values() if m)
+    excl_note = (f" ({', '.join(excluded_models)} excluded: output-token "
+                 f"shortfall, see † below)") if excluded_models else ""
     L.append(f"- **{labels[top]} leads output throughput on "
-             f"{'all four models' if lead_all else 'most models'}** at C=16 baseline "
-             f"(peak {peak:.0f} tok/s); across the 4-model matrix "
+             f"{'all four models' if (lead_all and not excluded_models) else 'most models'}** at C=16 baseline "
+             f"(peak {peak:.0f} tok/s); across the {len(MODEL_ORDER) - len(excluded_models)}-model matrix{excl_note} "
              f"{labels[second]} averages {share[second]:.0%} and "
              f"{labels[third]} {share[third]:.0%} of the leader's throughput.")
     L.append(f"- **{labels[top]} is also the most power-efficient**: "
@@ -248,9 +283,26 @@ def build() -> str:
     for slot, mid, desc in MODEL_ORDER:
         m = c16.get(mid, {})
         best = max(m.values(), default=None)
-        L.append(f"| {slot} · {mid} | "
-                 + " | ".join(f"{m[k]:.1f} ({pct(m[k], best)})" if k in m else "n/a"
-                              for k in keys) + " |")
+        cells = []
+        for k in keys:
+            if k in m:
+                cells.append(f"{m[k]:.1f} ({pct(m[k], best)})")
+            elif k in c16_raw.get(mid, {}):
+                val = c16_raw[mid][k]["output_throughput"]
+                cells.append(f"{val:.1f}†")
+            else:
+                cells.append("n/a")
+        L.append(f"| {slot} · {mid} | " + " | ".join(cells) + " |")
+    if excluded_models:
+        L.append("")
+        L.append("† **Provisional — excluded from rankings and derived stats.** "
+                 "Output-token accounting fell below threshold (expected "
+                 "50 × 256 = 12800 tokens): the gpt-oss-20b runs counted "
+                 "~17% of expected output tokens on all three systems "
+                 "(suspected reasoning-token split under the OpenAI chat "
+                 "endpoint). See each run's `report.md → Data quality`; "
+                 "values must not be ranked until diagnosed (2026-09-08 "
+                 "review, P0).")
     L.append("")
 
     L.append("### Batch scaling, C=1 → C=16 (baseline throughput ratio)\n")
@@ -414,6 +466,25 @@ def build() -> str:
 
     # ── caveats ────────────────────────────────────────────────────────────
     L.append("## Caveats\n")
+    L.append("- **Protocol defects (2026-09-08 review, P0)**: these runs used "
+             "vLLM 0.28.0 defaults with **prefix caching effectively ON in "
+             "every cell** (verified from server logs — the config only "
+             "*commented* it off) and a single measured pass per level "
+             "(2 warmups). With a fixed-seed workload, prompts are replayed "
+             "at each concurrency level, so prefix-cache hits (up to 76% on "
+             "M2/AMD @ C=16) inflate throughput — most at high C. The "
+             "corrected reference (cache off, per-level warmup until no JIT, "
+             "≥ 3 passes with server restarts) is implemented in "
+             "`container/run_matrix.py` + `config/models.yaml`; a re-run "
+             "(T0) is required before re-ranking. See "
+             "`docs/Benchmark_GPU_Conclusions_et_plan_de_tests_Benjamin.pdf`.")
+    L.append("- **M2 (gpt-oss-20b) is provisional on all systems**: only "
+             "~15–20% of the expected 12 800 output tokens were counted "
+             "(† in the tables). Suspected reasoning-token split under the "
+             "OpenAI chat endpoint (server logs show "
+             "`reasoning_parser='openai_gptoss'`); unconfirmed. M2 cells are "
+             "excluded from all derived stats above. Raw API diagnostics are "
+             "captured automatically on the next run (P0-2).")
     L.append("- **VRAM differs**: NVIDIA L40 has 45 GB vs 32 GB on AMD/Intel. "
              "All four models fit comfortably on 32 GB at this workload "
              "(~12.3 k KV tokens at C=16), so the extra headroom does not "

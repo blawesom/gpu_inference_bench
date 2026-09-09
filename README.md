@@ -145,8 +145,39 @@ object; the report table columns are unchanged.
 
 Identical across all models and vendors for comparability: random synthetic
 dataset, 512 input / 256 output tokens, 50 prompts per concurrency level,
-2 warmups (excluded from metrics), seed 42, temperature 0, `--ignore-eos`,
-concurrency sweep 1/4/8/16. All overridable in `config/models.yaml`.
+seed 42, temperature 0, `--ignore-eos`, concurrency sweep 1/4/8/16. All
+overridable in `config/models.yaml`.
+
+### Measurement protocol (P0, 2026-09-08 review)
+
+The Sept 3–5 runs were audited (`docs/Benchmark_GPU_Conclusions_et_plan_de_
+tests_Benjamin.pdf`) and found three protocol defects; the orchestrator now
+enforces the corrected reference:
+
+- **Prefix caching off and verified**: the server is started with
+  `--no-enable-prefix-caching` (vLLM 0.28.0 defaults to *on*, and the old
+  config only commented it off). After startup, `run_matrix.py` parses the
+  effective `enable_prefix_caching=` from the server log and **fails the
+  cell** if it comes back True. `report.md → Data quality` records the
+  verified value per cell.
+- **Per-level warmup until stable**: before each measured bench, the same
+  load shape (8 prompts, same concurrency) is replayed until **no new kernel
+  JIT compilations** appear in the server log (max 3 extra passes). The
+  Sept 3 run logged Triton JIT *inside* measured windows; 2 in-bench
+  warmups were not enough.
+- **3 measured passes with controlled server restarts**: each (cell,
+  concurrency) level is measured 3 times, restarting the server between
+  passes. `report.json`/`report.md` publish the **median** plus the pass
+  spread (`output_throughput_min/max`); a level that loses a pass is marked
+  `degraded` + `partial-passes`.
+- **Output-token accounting guard (P0-2)**: expected = num_prompts ×
+  random_output_len (12 800). A level below the 0.9 threshold is flagged
+  `output-token-shortfall` and a raw API diagnostic (finish reasons, usage
+  counters incl. reasoning tokens) is captured as `diag_<cell>_<C>.json`.
+  Numbers are flagged, **never corrected** — flagged cells are excluded
+  from cross-system rankings (`docs/compare_runs.py`).
+
+`--quick` smoke mode runs 1 pass without the external warmup.
 
 ## Model matrix
 
@@ -231,8 +262,9 @@ remains as a **no-op** for backward compatibility.
 - No speculative decoding: MTP is unsupported for every matrix model in
   vLLM v0.28.0 (verified in the spike); ngram is not a meaningful axis on the
   random workload.
-- `--enable-prefix-caching` is deliberately off (it distorts synthetic-token
-  throughput).
+- **Prefix caching is explicitly off and verified** (`--no-enable-prefix-caching`)
+  — the Sept 3–5 runs had it accidentally ON (config comment only); see the
+  Measurement protocol section and the 2026-09-08 review.
 - Power draw is best-effort: `null` ("n/a") where no vendor tool or driver
   exposes it (Intel: needs a recent kernel with the xe hwmon driver, or
   xpu-smi in the image).

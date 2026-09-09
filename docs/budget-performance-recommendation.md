@@ -12,6 +12,21 @@ Three-card fleet evaluation for `gpu_inference_bench`: **NVIDIA L40**, **AMD Rad
 | **NVIDIA L40** | 48 | **~$6,500 street (est.)** (MSRP $8,999) | **Performance + power-efficiency champion** — 384 tok/s geomean, 1.97 tok/s/W, most mature stack; worst $/tok per card |
 | **AMD Radeon AI PRO R9700** | 32 | **$1,700** (MSRP $1,299) | **Avoid for pure inference today** — only 43% of L40 at 130% of B70's price; ROCm/vLLM maturity issues (M3 batch collapse, kv-fp8 regressions, M1 long-context startup failure) |
 
+> ⚠️ **Data-quality caveat (2026-09-08 review, P0):** the Sept 3–5 runs
+> audited in `docs/Benchmark_GPU_Conclusions_et_plan_de_tests_Benjamin.pdf`
+> had **prefix caching accidentally ON in every cell** (the config only
+> commented it off; vLLM 0.28.0 defaults it on) and **M2 (gpt-oss-20b)
+> output token accounting is broken on all three systems** (~15–20% of the
+> expected 12 800 tokens counted — suspected reasoning-token split under the
+> OpenAI chat endpoint). Both defects inflate throughput, most at high
+> concurrency, and the M2 cell is now excluded from the cross-system
+> ranking. The corrected measurement protocol (cache off + verified,
+> per-level warmup until no JIT, 3 passes with server restarts, token
+> accounting guard) is implemented in `container/run_matrix.py` — the
+> verdicts above are **provisional until a corrected reference (T0) re-run**.
+> See `docs/cross-system-comparison.md` († flags + Caveats) and each run's
+> `report.md → Data quality`.
+
 ---
 
 ## 1. Input data
@@ -45,10 +60,10 @@ Market context: all three cards trade above MSRP in the 2026 memory-supply squee
 | Model | L40 | Arc Pro B70 | R9700 |
 |---|---|---|---|
 | M1 9B dense | **406.6** | 344.5 (85%) | 174.1 (43%) |
-| M2 20B MoE | **270.8** | 228.0 (84%) | 171.6 (63%) |
+| M2 20B MoE † | **270.8** | 228.0 (84%) | 171.6 (63%) |
 | M3 27B dense | **278.9** | 182.4 (65%) | 88.5 (32%) |
 | M4 35B MoE | **706.2** | 424.8 (60%) | 272.2 (39%) |
-| **Geomean** | **383.8** | **279.0 (72.7%)** | **163.8 (42.7%)** |
+| **Geomean** † | **383.8** | **279.0 (72.7%)** | **163.8 (42.7%)** |
 
 ### 2.2 Single-user latency (TPOT p50 @ C=1, ms; lower is better)
 

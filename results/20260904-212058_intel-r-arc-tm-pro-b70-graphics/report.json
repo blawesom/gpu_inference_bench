@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "run_id": "20260904-212058_intel-r-arc-tm-pro-b70-graphics",
-  "generated_at": "2026-09-04T21:01:42.214212+00:00",
+  "generated_at": "2026-09-09T13:17:05.288360+00:00",
   "environment": {
     "vendor": "intel",
     "gpu": "Intel(R) Arc(TM) Pro B70 Graphics",
@@ -109,8 +109,96 @@
     "bench_rows": 36,
     "skip_rows": 0,
     "fail_rows": 0,
+    "flagged_rows": 8,
     "vllm_version": "0.28.0+xpu"
   },
+  "data_quality": [
+    {
+      "cell": "M1 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M1 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M1 / long-context",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M2 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M2 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M3 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M3 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M4 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M4 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=1",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1979/12800 (16%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=4",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2088/12800 (16%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=8",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2254/12800 (18%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=16",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2121/12800 (17%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=1",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1796/12800 (14%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=4",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1831/12800 (14%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=8",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1861/12800 (14%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=16",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1940/12800 (15%)"
+    }
+  ],
   "rows": [
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -131,7 +219,15 @@
       "tpot_p99_ms": 29.022228993920912,
       "itl_p50_ms": 28.99241900013294,
       "itl_p90_ms": 29.03775009963283,
-      "itl_p99_ms": 29.23271380008373
+      "itl_p99_ms": 29.23271380008373,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -152,7 +248,15 @@
       "tpot_p99_ms": 30.828978220432784,
       "itl_p50_ms": 30.04390699970827,
       "itl_p90_ms": 30.11999909995211,
-      "itl_p99_ms": 30.739439299723017
+      "itl_p99_ms": 30.739439299723017,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -173,7 +277,15 @@
       "tpot_p99_ms": 33.141821766312134,
       "itl_p50_ms": 31.282893999559747,
       "itl_p90_ms": 31.4289510002709,
-      "itl_p99_ms": 35.35722983935557
+      "itl_p99_ms": 35.35722983935557,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -194,7 +306,15 @@
       "tpot_p99_ms": 37.87223182807636,
       "itl_p50_ms": 33.86692849926476,
       "itl_p90_ms": 34.060100999886345,
-      "itl_p99_ms": 94.97589662149039
+      "itl_p99_ms": 94.97589662149039,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -215,7 +335,15 @@
       "tpot_p99_ms": 29.21224362984097,
       "itl_p50_ms": 29.20041899960779,
       "itl_p90_ms": 29.25648509972234,
-      "itl_p99_ms": 29.39731091973954
+      "itl_p99_ms": 29.39731091973954,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -236,7 +364,15 @@
       "tpot_p99_ms": 31.001069014942985,
       "itl_p50_ms": 30.24666800047271,
       "itl_p90_ms": 30.347460099983437,
-      "itl_p99_ms": 30.76046650108765
+      "itl_p99_ms": 30.76046650108765,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -257,7 +393,15 @@
       "tpot_p99_ms": 33.19346277725744,
       "itl_p50_ms": 31.386019999445125,
       "itl_p90_ms": 31.51742610079964,
-      "itl_p99_ms": 31.99494590040558
+      "itl_p99_ms": 31.99494590040558,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -278,7 +422,15 @@
       "tpot_p99_ms": 38.13331903250882,
       "itl_p50_ms": 34.17228150010487,
       "itl_p90_ms": 34.416331900138175,
-      "itl_p99_ms": 95.6272355594956
+      "itl_p99_ms": 95.6272355594956,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -299,7 +451,15 @@
       "tpot_p99_ms": 29.01881775964377,
       "itl_p50_ms": 28.98396650016366,
       "itl_p90_ms": 29.029657899809536,
-      "itl_p99_ms": 29.2197614989891
+      "itl_p99_ms": 29.2197614989891,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -320,7 +480,15 @@
       "tpot_p99_ms": 30.824414941805884,
       "itl_p50_ms": 30.04235700063873,
       "itl_p90_ms": 30.127045099288807,
-      "itl_p99_ms": 30.701959220077697
+      "itl_p99_ms": 30.701959220077697,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -341,7 +509,15 @@
       "tpot_p99_ms": 33.1450953765104,
       "itl_p50_ms": 31.3001369995618,
       "itl_p90_ms": 31.43440590101818,
-      "itl_p99_ms": 35.33326383081658
+      "itl_p99_ms": 35.33326383081658,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -362,7 +538,15 @@
       "tpot_p99_ms": 37.85074769388353,
       "itl_p50_ms": 33.84364599969558,
       "itl_p90_ms": 34.039927100457135,
-      "itl_p99_ms": 95.03256300940848
+      "itl_p99_ms": 95.03256300940848,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -383,7 +567,18 @@
       "tpot_p99_ms": 62.62234838146316,
       "itl_p50_ms": 9.243969000635843,
       "itl_p90_ms": 9.329499000523356,
-      "itl_p99_ms": 28.31910065104239
+      "itl_p99_ms": 28.31910065104239,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1979,
+        "ratio": 0.155,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -404,7 +599,18 @@
       "tpot_p99_ms": 100.68231136831854,
       "itl_p50_ms": 13.15179399898625,
       "itl_p90_ms": 14.19748500084097,
-      "itl_p99_ms": 40.907744919604745
+      "itl_p99_ms": 40.907744919604745,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2088,
+        "ratio": 0.163,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -425,7 +631,18 @@
       "tpot_p99_ms": 121.6465799150228,
       "itl_p50_ms": 15.785286001118948,
       "itl_p90_ms": 16.988252999908582,
-      "itl_p99_ms": 48.88063899888954
+      "itl_p99_ms": 48.88063899888954,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2254,
+        "ratio": 0.176,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -446,7 +663,18 @@
       "tpot_p99_ms": 142.6699341345548,
       "itl_p50_ms": 18.872112500503135,
       "itl_p90_ms": 19.948957000451628,
-      "itl_p99_ms": 57.49312404972442
+      "itl_p99_ms": 57.49312404972442,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2121,
+        "ratio": 0.166,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -467,7 +695,18 @@
       "tpot_p99_ms": 55.983839293304904,
       "itl_p50_ms": 9.38325300012366,
       "itl_p90_ms": 9.46768840040022,
-      "itl_p99_ms": 28.873328479276093
+      "itl_p99_ms": 28.873328479276093,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1796,
+        "ratio": 0.14,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -488,7 +727,18 @@
       "tpot_p99_ms": 76.73620743759976,
       "itl_p50_ms": 13.234317999376799,
       "itl_p90_ms": 14.212495999890962,
-      "itl_p99_ms": 42.037045240794825
+      "itl_p99_ms": 42.037045240794825,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1831,
+        "ratio": 0.143,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -509,7 +759,18 @@
       "tpot_p99_ms": 91.7936581136382,
       "itl_p50_ms": 15.746187499644293,
       "itl_p90_ms": 17.003861000375764,
-      "itl_p99_ms": 49.59938345027699
+      "itl_p99_ms": 49.59938345027699,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1861,
+        "ratio": 0.145,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -530,7 +791,18 @@
       "tpot_p99_ms": 108.771366198058,
       "itl_p50_ms": 18.729666000581346,
       "itl_p90_ms": 19.89484680016176,
-      "itl_p99_ms": 58.01154248001694
+      "itl_p99_ms": 58.01154248001694,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1940,
+        "ratio": 0.152,
+        "flag": "output-token-shortfall"
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -551,7 +823,15 @@
       "tpot_p99_ms": 35.73782898749136,
       "itl_p50_ms": 35.698715500075195,
       "itl_p90_ms": 35.7871358990451,
-      "itl_p99_ms": 36.7832486997213
+      "itl_p99_ms": 36.7832486997213,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -572,7 +852,15 @@
       "tpot_p99_ms": 42.782018696665574,
       "itl_p50_ms": 38.46648049966461,
       "itl_p90_ms": 38.5772449995784,
-      "itl_p99_ms": 40.08391370982281
+      "itl_p99_ms": 40.08391370982281,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -593,7 +881,15 @@
       "tpot_p99_ms": 51.68161073192367,
       "itl_p50_ms": 41.60467749898089,
       "itl_p90_ms": 41.744366999591875,
-      "itl_p99_ms": 43.182309231342515
+      "itl_p99_ms": 43.182309231342515,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -614,7 +910,15 @@
       "tpot_p99_ms": 76.51638732851043,
       "itl_p50_ms": 55.15867400026764,
       "itl_p90_ms": 55.462415099282225,
-      "itl_p99_ms": 408.31116394048877
+      "itl_p99_ms": 408.31116394048877,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -635,7 +939,15 @@
       "tpot_p99_ms": 36.19918641337355,
       "itl_p50_ms": 36.16073599914671,
       "itl_p90_ms": 36.27964779880131,
-      "itl_p99_ms": 37.2263256295264
+      "itl_p99_ms": 37.2263256295264,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -656,7 +968,15 @@
       "tpot_p99_ms": 43.20738812756919,
       "itl_p50_ms": 38.86939949916268,
       "itl_p90_ms": 38.994394199107774,
-      "itl_p99_ms": 40.52716041162057
+      "itl_p99_ms": 40.52716041162057,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -677,7 +997,15 @@
       "tpot_p99_ms": 51.95563187360647,
       "itl_p50_ms": 41.853509997963556,
       "itl_p90_ms": 41.99464499943133,
-      "itl_p99_ms": 43.590931730286684
+      "itl_p99_ms": 43.590931730286684,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -698,7 +1026,15 @@
       "tpot_p99_ms": 77.24702071533872,
       "itl_p50_ms": 55.768274502042914,
       "itl_p90_ms": 56.10847419920901,
-      "itl_p99_ms": 410.19352822106157
+      "itl_p99_ms": 410.19352822106157,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -719,7 +1055,15 @@
       "tpot_p99_ms": 23.050322803371508,
       "itl_p50_ms": 22.957651501201326,
       "itl_p90_ms": 23.141815099370433,
-      "itl_p99_ms": 23.45369764316274
+      "itl_p99_ms": 23.45369764316274,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -740,7 +1084,15 @@
       "tpot_p99_ms": 23.71156173839443,
       "itl_p50_ms": 22.978807997787953,
       "itl_p90_ms": 23.15527710306924,
-      "itl_p99_ms": 23.46931033989677
+      "itl_p99_ms": 23.46931033989677,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -761,7 +1113,15 @@
       "tpot_p99_ms": 24.792843033730676,
       "itl_p50_ms": 23.051544001646107,
       "itl_p90_ms": 23.332533997745486,
-      "itl_p99_ms": 24.65504931849864
+      "itl_p99_ms": 24.65504931849864,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -782,7 +1142,15 @@
       "tpot_p99_ms": 31.059192518234124,
       "itl_p50_ms": 28.225445001226035,
       "itl_p90_ms": 28.985193102926132,
-      "itl_p99_ms": 103.23549290806113
+      "itl_p99_ms": 103.23549290806113,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -803,7 +1171,15 @@
       "tpot_p99_ms": 23.3931197423915,
       "itl_p50_ms": 23.33618200100318,
       "itl_p90_ms": 23.497222898731707,
-      "itl_p99_ms": 23.803429079089256
+      "itl_p99_ms": 23.803429079089256,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -824,7 +1200,15 @@
       "tpot_p99_ms": 24.144807403607583,
       "itl_p50_ms": 23.421064001013292,
       "itl_p90_ms": 23.58851500066521,
-      "itl_p99_ms": 24.017362400445563
+      "itl_p99_ms": 24.017362400445563,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -845,7 +1229,15 @@
       "tpot_p99_ms": 25.21283055094111,
       "itl_p50_ms": 23.450087999663083,
       "itl_p90_ms": 23.734509001951665,
-      "itl_p99_ms": 24.562295961841304
+      "itl_p99_ms": 24.562295961841304,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -866,7 +1258,15 @@
       "tpot_p99_ms": 31.169204515055323,
       "itl_p50_ms": 28.312301999903866,
       "itl_p90_ms": 29.0838418979547,
-      "itl_p99_ms": 69.87734203012224
+      "itl_p99_ms": 69.87734203012224,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     }
   ]
 }

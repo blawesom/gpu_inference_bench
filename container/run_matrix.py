@@ -57,6 +57,218 @@ HF_CACHE = os.environ.get("HF_HOME", "/hf-cache")
 HEALTH_PATH = "/health"
 DEFAULT_START_TIMEOUT = int(os.environ.get("SERVER_START_TIMEOUT", "900"))
 
+# ── P0-3 compile-detection for per-level warmup ──────────────────────────
+# Matches vLLM 0.28.0's JIT-monitor warning (and a few other compilation
+# indicators) emitted by the server during the measured window. Only the
+# NEW log content appended during a pass is scanned, so startup messages
+# like "Kernel JIT monitor activated" are never a false positive.
+COMPILE_WARN_RE = re.compile(
+    r"JIT compilation during inference",
+    re.I)
+
+# ── P0-2 token accounting ───────────────────────────────────────────────
+PREFIX_CACHE_RE = re.compile(
+    r"enable_prefix_caching=(True|False)")
+# ── P0-2 API diagnostic (captured on output-token shortfall) ───────────
+DIAG_PROMPT = (
+    "Write a concise but complete explanation of how a Transformer model "
+    "encodes positional information in the absence of explicit position "
+    "embeddings, and compare rotary position embeddings (RoPE) with "
+    "learned absolute positions in terms of length generalization. "
+    "Use mathematical notation where helpful, but keep the prose "
+    "accessible to someone with a graduate-level ML background. "
+    "Aim for around four paragraphs. "
+    "Do not include any code, and do not use bullet points.")
+DIAG_REQUEST_TIMEOUT = 600  # generous: 256 tokens × 3 requests × model latency
+
+
+def effective_prefix_caching(log_path: Path) -> bool | None:
+    """Parse the engine config dump for the effective prefix-caching value.
+
+    Returns True/False, or None if the log is missing / unparseable."""
+    try:
+        text = log_path.read_text(errors="replace")
+    except OSError:
+        return None
+    m = PREFIX_CACHE_RE.search(text)
+    return m.group(1) == "True" if m else None
+
+
+def new_log_region(log_path: Path, start_offset: int) -> str:
+    """Return bytes written to the log since start_offset."""
+    try:
+        with open(log_path, "rb") as f:
+            f.seek(start_offset)
+            data = f.read()
+    except OSError:
+        return ""
+    return data.decode(errors="replace")
+
+
+def _emit_flag(flag: str, val, extra: list[str], st: dict) -> None:
+    """Apply one YAML flag dict entry into extra (and the mutable state st)."""
+    if flag == "max-model-len":
+        st["max_len"] = "true" if val is True else str(val)
+    elif val is True:
+        extra.append(f"--{flag}")
+    else:
+        extra.extend([f"--{flag}", str(val)])
+
+
+def _apply_flags(flags: dict, extra: list[str], st: dict) -> None:
+    """Emit a flags: dict into the extra argv list (and st[max_len]).
+
+    Precedence is handled by the caller: common first, then model, then
+    config — each call mutates the same `extra` / `st` so later calls win.
+    """
+    for flag, val in (flags or {}).items():
+        _emit_flag(flag, val, extra, st)
+
+
+def _build_bench_cmd(model: dict, workload: dict, concurrency: int,
+                     out_file: str,
+                     num_prompts: int | None = None,
+                     num_warmups: int | None = None) -> list[str]:
+    """Assemble the ``vllm bench serve`` argv for one concurrency level.
+
+    Optional overrides: ``num_prompts`` and ``num_warmups`` let the caller
+    adjust the client-side load (e.g. fewer prompts for a warmup pass)."""
+    return [
+        "vllm", "bench", "serve",
+        "--host", "127.0.0.1", "--port", str(workload.get("port", 8000)),
+        "--backend", workload.get("backend", "openai-chat"),
+        "--endpoint", workload.get("endpoint", "/v1/chat/completions"),
+        "--model", model["id"],
+        "--dataset-name", "random",
+        "--random-input-len",
+        str(workload.get("random_input_len", 512)),
+        "--random-output-len",
+        str(workload.get("random_output_len", 256)),
+        "--num-prompts",
+        str(num_prompts or workload.get("num_prompts", 50)),
+        "--max-concurrency", str(concurrency),
+        "--num-warmups",
+        str(num_warmups if num_warmups is not None
+            else workload.get("num_warmups", 2)),
+        "--seed", str(workload.get("seed", 42)),
+        "--temperature", str(workload.get("temperature", 0)),
+        "--ignore-eos",
+        "--percentile-metrics",
+        workload.get("percentile_metrics", "ttft,tpot,itl"),
+        "--metric-percentiles",
+        workload.get("metric_percentiles", "50,90,99"),
+        "--save-result",
+        "--result-filename", out_file,
+    ]
+
+
+def _check_tokens(raw: dict, workload: dict,
+                  threshold: float = 0.9) -> dict | None:
+    """Output-token accounting guard. Returns check dict or None."""
+    try:
+        expected = (
+            int(workload.get("num_prompts", 50))
+            * int(workload.get("random_output_len", 256)))
+    except (TypeError, ValueError):
+        return None
+    actual = raw.get("total_output_tokens")
+    if actual is None or expected <= 0:
+        return None
+    ratio = actual / expected
+    check: dict = {"expected": expected, "actual": actual, "ratio": round(ratio, 3)}
+    if ratio < threshold:
+        check["flag"] = "output-token-shortfall"
+    return check
+
+
+def _diagnose_shortfall(
+    tag: str, c: int, port: int, model_id: str,
+    workload: dict, out_dir: Path) -> Path:
+    """Send N chat completions and save raw API responses.
+
+    Captures finish_reason, usage.prompt_tokens, usage.completion_tokens,
+    usage.completion_tokens_details (reasoning_tokens) when present.
+    Best-effort: any failure is logged and the file still gets written.
+    """
+    import urllib.parse
+    out_path = out_dir / f"diag_{tag}_{c}.json"
+    n = 3
+    params = json.dumps({
+        "model": model_id,
+        "messages": [{"role": "user", "content": DIAG_PROMPT}],
+        "max_tokens": int(workload.get("random_output_len", 256)),
+        "temperature": workload.get("temperature", 0),
+        "ignore_eos": True,
+    })
+    responses = []
+    url = f"http://127.0.0.1:{port}/v1/chat/completions"
+    for i in range(n):
+        try:
+            req = urllib.request.Request(
+                url, data=params.encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST")
+            with urllib.request.urlopen(req, timeout=DIAG_REQUEST_TIMEOUT) as r:
+                body = json.loads(r.read())
+                responses.append({"index": i, "raw": body})
+        except Exception as e:
+            responses.append({"index": i, "error": str(e)[:400]})
+    out_path.write_text(json.dumps({"tag": tag, "concurrency": c,
+                                    "num_requests": n,
+                                    "responses": responses}, indent=2))
+    return out_path
+
+
+def build_server_cmd(model: dict, cfg: dict, common: dict) -> list[str]:
+    """Assemble the ``vllm serve ...`` argv for one (model, config) cell.
+
+    Precedence: common < model < config (each later ``flags:`` dict overrides).
+    ``flags:`` entries in any layer become CLI args; ``true`` → bare flag.
+
+    P0 note (2026-09-08 review): the common layer now carries
+    ``no-enable-prefix-caching: true`` — vLLM 0.28.0 defaults to
+    enable_prefix_caching=True and the old config only *commented* that it
+    was off, so prefix caching was actually ON in the 2026-09-03 run (up to
+    76% hit rate on M2/AMD at C=16). run_matrix.py verifies the effective
+    value in the server log and fails the cell if it comes back True.
+
+    ``max_num_seqs:`` (model or common) — emitted as ``--max-num-seqs``. The
+    workload tops out at C=16, and hybrid Mamba/GDN models hard-fail startup
+    when max_num_seqs exceeds their Mamba cache block count (e.g. M4 on a
+    32 GB card: 21 blocks), so the matrix pins it to the workload ceiling.
+    ``max-model-len`` — model defaults to config; long-context can override.
+    """
+    st: dict = {"max_len": str(
+        model.get("max_model_len", common.get("max-model-len", 8192)))}
+    extra: list[str] = []
+    # common flags first (lowest priority)
+    _apply_flags(common.get("flags"), extra, st)
+    # model flags
+    _apply_flags(model.get("flags"), extra, st)
+    # config flags (highest priority — override model + common)
+    _apply_flags(cfg.get("flags"), extra, st)
+    max_len = st["max_len"]
+
+    cmd = ["vllm", "serve", model["id"],
+           "--host", str(common.get("host", "0.0.0.0")),
+           "--port", str(common.get("port", 8000)),
+           "--max-model-len", max_len,
+           "--gpu-memory-utilization",
+           str(model.get("gpu_memory_utilization",
+                         common.get("gpu_memory_utilization", 0.90)))]
+    max_num_seqs = model.get("max_num_seqs", common.get("max_num_seqs"))
+    if max_num_seqs is not None:
+        cmd.extend(["--max-num-seqs", str(max_num_seqs)])
+    if common.get("trust_remote_code", True):
+        cmd.append("--trust-remote-code")
+    return cmd + extra
+
+
+def build_bench_cmd(model: dict, workload: dict, concurrency: int,
+                    out_file: str) -> list[str]:
+    """Assemble the ``vllm bench serve ...`` argv for one concurrency level."""
+    return _build_bench_cmd(model, workload, concurrency, out_file)
+
 
 def _run_cmd(cmd: list[str], env: dict | None = None, timeout: float = 20.0) -> str | None:
     """Run a command, return stdout or None on any failure."""
@@ -491,79 +703,6 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── Command builders ─────────────────────────────────────────────────────────
-def build_server_cmd(model: dict, cfg: dict, common: dict) -> list[str]:
-    """Assemble the `vllm serve ...` argv for one (model, config) cell.
-
-    Precedence: common < model < config.
-
-    Model-level ``flags:`` dict (new) — merged after common, before config flags.
-    Model-level ``gpu_memory_utilization:`` — overrides the common setting.
-    ``max_num_seqs:`` (model or common) — emitted as ``--max-num-seqs``. The
-    workload tops out at C=16, and hybrid Mamba/GDN models hard-fail startup
-    when max_num_seqs exceeds their Mamba cache block count (e.g. M4 on a
-    32 GB card: 21 blocks), so the matrix pins it to the workload ceiling.
-    ``max-model-len`` — model defaults to config; long-context can override.
-    """
-    max_len = str(model.get("max_model_len", common.get("max-model-len", 8192)))
-    gpu_util = str(model.get("gpu_memory_utilization",
-                             common.get("gpu_memory_utilization", 0.90)))
-    max_num_seqs = model.get("max_num_seqs", common.get("max_num_seqs"))
-    extra: list[str] = []
-    # model-level flags (applied between common and config flags)
-    for flag, val in (model.get("flags") or {}).items():
-        if flag == "max-model-len":
-            max_len = "true" if val is True else str(val)
-        elif val is True:
-            extra.append(f"--{flag}")
-        else:
-            extra.extend([f"--{flag}", str(val)])
-    # config flags (override model + common)
-    for flag, val in (cfg.get("flags") or {}).items():
-        if flag == "max-model-len":
-            max_len = "true" if val is True else str(val)
-        elif val is True:
-            extra.append(f"--{flag}")
-        else:
-            extra.extend([f"--{flag}", str(val)])
-
-    cmd = ["vllm", "serve", model["id"],
-           "--host", str(common.get("host", "0.0.0.0")),
-           "--port", str(common.get("port", 8000)),
-           "--max-model-len", max_len,
-           "--gpu-memory-utilization", gpu_util]
-    if max_num_seqs is not None:
-        cmd.extend(["--max-num-seqs", str(max_num_seqs)])
-    if common.get("trust_remote_code", True):
-        cmd.append("--trust-remote-code")
-    return cmd + extra
-
-
-def build_bench_cmd(model: dict, workload: dict, concurrency: int,
-                    out_file: str) -> list[str]:
-    """Assemble the `vllm bench serve ...` argv for one concurrency level."""
-    return [
-        "vllm", "bench", "serve",
-        "--host", "127.0.0.1", "--port", str(workload.get("port", 8000)),
-        "--backend", workload.get("backend", "openai-chat"),
-        "--endpoint", workload.get("endpoint", "/v1/chat/completions"),
-        "--model", model["id"],
-        "--dataset-name", "random",
-        "--random-input-len", str(workload.get("random_input_len", 512)),
-        "--random-output-len", str(workload.get("random_output_len", 256)),
-        "--num-prompts", str(workload.get("num_prompts", 50)),
-        "--max-concurrency", str(concurrency),
-        "--num-warmups", str(workload.get("num_warmups", 2)),
-        "--seed", str(workload.get("seed", 42)),
-        "--temperature", str(workload.get("temperature", 0)),
-        "--ignore-eos",
-        "--percentile-metrics", workload.get("percentile_metrics", "ttft,tpot,itl"),
-        "--metric-percentiles", workload.get("metric_percentiles", "50,90,99"),
-        "--save-result",
-        "--result-filename", out_file,
-    ]
-
-
 # ── Server lifecycle ─────────────────────────────────────────────────────────
 def wait_health(port: int, timeout: float,
                 proc: subprocess.Popen | None = None) -> bool:
@@ -676,7 +815,6 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
              results: Path, vendor: str, gpu_index: int | None, concurrencies: list[int],
              start_timeout: int, dry_run: bool) -> dict:
     tag = f"{model_key}_{cfg['name']}"
-    server_log = results / f"server_{tag}.log"
     port = int(common.get("port", 8000))
     s_cmd = build_server_cmd(model, cfg, common)
     print(f"[cell {tag}] server: {' '.join(s_cmd)}")
@@ -692,59 +830,191 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
                                       common.get("max_num_seqs", 256)),
             **{f.replace("-", "_"): v for f, v in (cfg.get("flags") or {}).items()},
         },
-        "server_log": server_log.name,
+        "server_log": None,
         "concurrency_results": {},
     }
+    # ── P0-3 protocol: measured passes (with controlled server restarts)
+    #    and per-level warmup until no new kernel JIT compilations appear.
+    num_passes = max(1, int(workload.get("num_passes", 1)))
+    warmup_max = max(0, int(workload.get("warmup_max_passes", 0)))
+    warmup_prompts = int(workload.get("warmup_prompts", 8))
+    token_threshold = float(workload.get("token_check_threshold", 0.9))
+    requested_off_prefix = "--no-enable-prefix-caching" in s_cmd
+
     if dry_run:
         for c in concurrencies:
-            b_cmd = build_bench_cmd(model, workload, c, f"bench_{tag}_{c}.json")
-            print(f"[cell {tag}]   bench C={c}: {' '.join(b_cmd)}")
+            w_cmd = _build_bench_cmd(model, workload, c,
+                                     f"warmup_{tag}_{c}_1.json",
+                                     num_prompts=warmup_prompts,
+                                     num_warmups=0)
+            b_cmd = build_bench_cmd(model, workload, c, f"bench_{tag}_{c}_pass1.json")
+            print(f"[cell {tag}]   warmup C={c}: {' '.join(w_cmd)}")
+            print(f"[cell {tag}]   bench  C={c} (pass 1/{num_passes}): "
+                  f"{' '.join(b_cmd)}")
         cell["status"] = "dry-run"
+        cell["protocol"] = {
+            "num_passes": num_passes,
+            "warmup_max_passes": warmup_max,
+            "prefix_caching": ("disabled (--no-enable-prefix-caching)"
+                               if requested_off_prefix else "NOT explicitly off"),
+        }
         return cell
 
-    server: subprocess.Popen | None = None
+    cell["protocol"] = {
+        "num_passes": num_passes,
+        "warmup_max_passes": warmup_max,
+        "prefix_caching": ("disabled (--no-enable-prefix-caching)"
+                           if requested_off_prefix else "NOT explicitly off"),
+    }
+    cell["server_logs"] = {}
+    diag_done = False
+    sampler = (TelemetrySampler(vendor, gpu_index) if TelemetrySampler else None)
+
+    def _sweep_pass(pass_i: int) -> str | None:
+        """Run one full pass (all concurrency levels). Returns an error
+        string to abort the cell, or None on success."""
+        nonlocal diag_done
+        server_log_i = results / f"server_{tag}_pass{pass_i}.log"
+        cell["server_logs"][str(pass_i)] = server_log_i.name
+        if pass_i == 1:
+            cell["server_log"] = server_log_i.name  # legacy key
+        server_p = start_server(s_cmd, server_log_i)
+        try:
+            if not wait_health(port, start_timeout, proc=server_p):
+                st, reason = parse_skip_reason(server_log_i)
+                print(f"[cell {tag}] pass {pass_i}: server FAILED → "
+                      f"{st}:{reason}")
+                return f"pass{pass_i}-{st}:{reason}"
+            # P0-1: verify the effective prefix-caching value in the log.
+            eff_pc = effective_prefix_caching(server_log_i)
+            if pass_i == 1:
+                cell["server_flags"]["effective_prefix_caching"] = eff_pc
+            if requested_off_prefix and eff_pc is True:
+                reason = ("prefix-caching-not-disabled (server log shows "
+                          "enable_prefix_caching=True despite "
+                          "--no-enable-prefix-caching)")
+                print(f"[cell {tag}] pass {pass_i}: {reason}")
+                return reason
+            if eff_pc is None:
+                print(f"[cell {tag}] pass {pass_i}: WARN could not parse "
+                      f"effective enable_prefix_caching from server log")
+            elif eff_pc is True:
+                print(f"[cell {tag}] pass {pass_i}: WARN prefix caching is "
+                      f"EFFECTIVELY ON — throughput may be inflated by "
+                      f"prompt replay across concurrency levels")
+            print(f"[cell {tag}] pass {pass_i}/{num_passes}: server healthy "
+                  f"→ sweeping C={concurrencies}")
+            for c in concurrencies:
+                level = cell["concurrency_results"].setdefault(str(c), {
+                    "status": "ok", "reason": None, "passes": [],
+                })
+                # ── P0-3 warmup: replay the same load shape until no NEW
+                # kernel JIT compilations appear in the server log (or
+                # warmup_max passes are exhausted).
+                warmup_rec = {"max_passes": warmup_max, "passes": 0,
+                              "stable": False, "compilations": []}
+                for n in range(1, warmup_max + 1):
+                    off = (server_log_i.stat().st_size
+                           if server_log_i.exists() else 0)
+                    w_out = results / f"warmup_{tag}_{c}_{n}.json"
+                    w_cmd = _build_bench_cmd(model, workload, c,
+                                             str(w_out),
+                                             num_prompts=warmup_prompts,
+                                             num_warmups=0)
+                    print(f"[cell {tag}]   warmup C={c} pass {n} "
+                          f"({warmup_prompts} prompts) ...")
+                    subprocess.run(w_cmd, capture_output=True, text=True)
+                    new = new_log_region(server_log_i, off)
+                    comps = COMPILE_WARN_RE.findall(new)
+                    warmup_rec["passes"] = n
+                    warmup_rec["compilations"].extend(comps)
+                    if not comps:
+                        warmup_rec["stable"] = True
+                        break
+                    print(f"[cell {tag}]   warmup C={c}: {len(comps)} new "
+                          f"JIT compilation(s) — continuing")
+                level["warmup"] = warmup_rec
+                # ── P0-3 measured bench (telemetry around the run).
+                off = (server_log_i.stat().st_size
+                       if server_log_i.exists() else 0)
+                bench_out = results / f"bench_{tag}_{c}_pass{pass_i}.json"
+                b_cmd = build_bench_cmd(model, workload, c, str(bench_out))
+                print(f"[cell {tag}]   bench C={c} pass {pass_i} ...")
+                samples = []
+                if sampler:
+                    samples = sampler.start()
+                t0 = time.time()
+                proc = subprocess.run(b_cmd, capture_output=True, text=True)
+                wall = time.time() - t0
+                if sampler:
+                    samples = sampler.stop()
+                telem_out = results / \
+                    f"telemetry_{tag}_{c}_pass{pass_i}.json"
+                telem = (sampler.aggregate(samples)
+                         if (sampler and samples) else None)
+                if telem_out and telem is not None:
+                    telem_out.write_text(json.dumps(telem, indent=2))
+                pass_entry: dict = {
+                    "pass": pass_i,
+                    "bench_json": bench_out.name,
+                    "telemetry_json": (telem_out.name if telem else None),
+                    "wall_time_s": round(wall, 1),
+                    "status": "ok", "reason": None,
+                    "jit_during_bench": bool(
+                        COMPILE_WARN_RE.search(new_log_region(server_log_i, off))),
+                    "token_check": None,
+                }
+                if pass_entry["jit_during_bench"]:
+                    print(f"[cell {tag}]   WARN C={c} pass {pass_i}: kernel "
+                          f"JIT compilation inside the measured window")
+                if proc.returncode != 0 or not bench_out.exists():
+                    pass_entry["status"] = "failed"
+                    pass_entry["reason"] = (proc.stderr or proc.stdout or "")[-400:]
+                else:
+                    raw = json.loads(bench_out.read_text())
+                    # P0-2: output-token accounting guard. Flag only — the
+                    # throughput numbers are NEVER "corrected".
+                    tc = _check_tokens(raw, workload, token_threshold)
+                    pass_entry["token_check"] = tc
+                    if tc and tc.get("flag") and not diag_done:
+                        print(f"[cell {tag}]   output-token shortfall at C={c} "
+                              f"({tc['actual']}/{tc['expected']}) → capturing "
+                              f"API diagnostic")
+                        _diagnose_shortfall(tag, c, port, model["id"],
+                                            workload, results)
+                        diag_done = True
+                level["passes"].append(pass_entry)
+            return None
+        finally:
+            stop_server(server_p)
+
     try:
-        server = start_server(s_cmd, server_log)
-        if not wait_health(port, start_timeout, proc=server):
-            cell["status"], cell["reason"] = parse_skip_reason(server_log)
-            print(f"[cell {tag}] server FAILED → {cell['status']}:{cell['reason']}")
-            return cell
-        cell["status"] = "ok"
-        print(f"[cell {tag}] server healthy → sweeping C={concurrencies}")
+        for pass_i in range(1, num_passes + 1):
+            err = _sweep_pass(pass_i)
+            if err is not None:
+                cell["status"] = "failed"
+                cell["reason"] = err
+                # keep whatever earlier passes produced (report.py handles
+                # partial pass sets); stop the remaining passes.
+                break
+        # per-level status from the pass entries
+        for c_str, level in cell["concurrency_results"].items():
+            passes = level.get("passes", [])
+            ok = [p for p in passes if p["status"] == "ok"]
+            if not passes:
+                level["status"], level["reason"] = "failed", "no-passes-run"
+            elif not ok:
+                level["status"] = "failed"
+                level["reason"] = passes[-1].get("reason")
+            elif len(ok) < len(passes):
+                level["status"] = "degraded"
+                level["reason"] = (f"{len(ok)}/{len(passes)} passes ok; "
+                                   f"last failure: "
+                                   f"{(passes[-1].get('reason') or '')[:120]}")
+            else:
+                level["status"], level["reason"] = "ok", None
     except Exception as e:  # defensive: never lose a cell to an exception
         cell["status"], cell["reason"] = "failed", f"orchestration:{e}"
-        return cell
-
-    sampler = (TelemetrySampler(vendor, gpu_index) if TelemetrySampler else None)
-    try:
-        for c in concurrencies:
-            bench_out = results / f"bench_{tag}_{c}.json"
-            b_cmd = build_bench_cmd(model, workload, c, str(bench_out))
-            print(f"[cell {tag}]   bench C={c} ...")
-            samples = []
-            if sampler:
-                samples = sampler.start()
-            t0 = time.time()
-            proc = subprocess.run(b_cmd, capture_output=True, text=True)
-            wall = time.time() - t0
-            if sampler:
-                samples = sampler.stop()
-            telem_out = results / f"telemetry_{tag}_{c}.json"
-            telem = sampler.aggregate(samples) if (sampler and samples) else None
-            if telem_out and telem is not None:
-                telem_out.write_text(json.dumps(telem, indent=2))
-
-            level: dict = {
-                "bench_json": bench_out.name,
-                "telemetry_json": (telem_out.name if telem is not None else None),
-                "status": "ok", "reason": None, "wall_time_s": round(wall, 1),
-            }
-            if proc.returncode != 0 or not bench_out.exists():
-                level["status"] = "failed"
-                level["reason"] = (proc.stderr or proc.stdout or "")[-400:]
-            cell["concurrency_results"][str(c)] = level
-    finally:
-        stop_server(server)
     return cell
 
 
@@ -791,7 +1061,11 @@ def main() -> int:
     configs_by_name = {name: {**cfg, "name": name} for name, cfg in configs.items()}
 
     if args.quick:
+        # Smoke mode: single pass, no external per-level warmup (the
+        # in-bench --num-warmups still applies).
         model_keys, names, concurrencies = ["M1"], ["baseline", "kv-fp8"], [1, 8]
+        workload["num_passes"] = 1
+        workload["warmup_max_passes"] = 0
     else:
         model_keys, names, concurrencies = (
             list(models.keys()), None,

@@ -1,6 +1,6 @@
 # GPU Inference Bench Report
 
-**0x7551** · Run: 20260903-222650_0x7551 · vLLM 0.28.0+rocm723 · 2026-09-03T23:03:48.088007+00:00
+**0x7551** · Run: 20260903-222650_0x7551 · vLLM 0.28.0+rocm723 · 2026-09-09T13:16:55.864299+00:00
 
 | Metric | Value |
 |---|---|
@@ -49,53 +49,75 @@
 
 ## M1 · Qwen/Qwen3.5-9B
 
-| Config | C | Status | Req/s | Tok/s | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Mem peak GB | Util % | Power W |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| baseline | 1 | ok | 0.07 | 18.48 | 140.11 | 145.29 | 53.78 | 53.92 | 53.77 | 54.00 | 692.68 | 26.12 | 98.60 | 189.80 |
-| baseline | 4 | ok | 0.27 | 68.58 | 427.49 | 428.88 | 54.77 | 55.71 | 54.72 | 55.45 | 186.63 | 26.44 | 96.40 | 211.40 |
-| baseline | 8 | ok | 0.41 | 105.50 | 503.14 | 822.85 | 67.25 | 69.07 | 66.86 | 68.83 | 121.32 | 26.44 | 95.80 | 221.90 |
-| baseline | 16 | ok | 0.68 | 174.15 | 889.60 | 1626.59 | 74.25 | 76.52 | 72.06 | 166.95 | 73.50 | 26.44 | 93.40 | 209.60 |
-| kv-fp8 | 1 | ok | 0.07 | 17.65 | 139.02 | 140.45 | 56.34 | 56.45 | 56.32 | 56.98 | 725.10 | 26.12 | 98.20 | 187 |
-| kv-fp8 | 4 | ok | 0.26 | 65.77 | 429.10 | 431.99 | 57.16 | 58.14 | 57.10 | 57.82 | 194.61 | 26.44 | 96.90 | 208.80 |
-| kv-fp8 | 8 | ok | 0.40 | 101.87 | 512.46 | 830.05 | 69.63 | 71.44 | 69.24 | 70.28 | 125.65 | 26.44 | 96.30 | 219.70 |
-| kv-fp8 | 16 | ok | 0.66 | 168.94 | 896.89 | 1635.71 | 76.35 | 78.63 | 74.16 | 169.43 | 75.77 | 26.44 | 93.50 | 208.30 |
-| long-context | n/a | failed: engine-startup | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Config | C | Status | Req/s | Tok/s (median) | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Flags | Mem peak GB | Util % | Power W |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 1 | ok | 0.07 | 18.48 | 140.11 | 145.29 | 53.78 | 53.92 | 53.77 | 54.00 | 692.68 | — | 26.12 | 98.60 | 189.80 |
+| baseline | 4 | ok | 0.27 | 68.58 | 427.49 | 428.88 | 54.77 | 55.71 | 54.72 | 55.45 | 186.63 | — | 26.44 | 96.40 | 211.40 |
+| baseline | 8 | ok | 0.41 | 105.50 | 503.14 | 822.85 | 67.25 | 69.07 | 66.86 | 68.83 | 121.32 | — | 26.44 | 95.80 | 221.90 |
+| baseline | 16 | ok | 0.68 | 174.15 | 889.60 | 1626.59 | 74.25 | 76.52 | 72.06 | 166.95 | 73.50 | — | 26.44 | 93.40 | 209.60 |
+| kv-fp8 | 1 | ok | 0.07 | 17.65 | 139.02 | 140.45 | 56.34 | 56.45 | 56.32 | 56.98 | 725.10 | — | 26.12 | 98.20 | 187 |
+| kv-fp8 | 4 | ok | 0.26 | 65.77 | 429.10 | 431.99 | 57.16 | 58.14 | 57.10 | 57.82 | 194.61 | — | 26.44 | 96.90 | 208.80 |
+| kv-fp8 | 8 | ok | 0.40 | 101.87 | 512.46 | 830.05 | 69.63 | 71.44 | 69.24 | 70.28 | 125.65 | — | 26.44 | 96.30 | 219.70 |
+| kv-fp8 | 16 | ok | 0.66 | 168.94 | 896.89 | 1635.71 | 76.35 | 78.63 | 74.16 | 169.43 | 75.77 | — | 26.44 | 93.50 | 208.30 |
+| long-context | n/a | failed: engine-startup | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | — | n/a | n/a | n/a |
 
 ## M2 · openai/gpt-oss-20b
 
-| Config | C | Status | Req/s | Tok/s | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Mem peak GB | Util % | Power W |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| baseline | 1 | ok | 0.35 | 16.25 | 108.66 | 109.56 | 72.13 | 143.13 | 20.18 | 61.13 | 141.33 | 23.89 | 93.80 | 240.60 |
-| baseline | 4 | ok | 0.77 | 37.14 | 94.48 | 100.82 | 119.62 | 242.15 | 35.62 | 112.95 | 65.13 | 23.89 | 91.50 | 263 |
-| baseline | 8 | ok | 2.54 | 127.67 | 65.16 | 84.10 | 68.76 | 137.02 | 19.80 | 60.39 | 19.66 | 23.89 | 80.90 | 229.50 |
-| baseline | 16 | ok | 3.91 | 171.65 | 71.67 | 509.46 | 83.56 | 156.61 | 21.89 | 68.45 | 12.79 | 23.89 | 72.30 | 208.60 |
-| kv-fp8 | 1 | ok | 0.36 | 13.40 | 112.93 | 113.76 | 72.78 | 170.93 | 20.16 | 60.95 | 138.23 | 23.89 | 94.30 | 238.20 |
-| kv-fp8 | 4 | ok | 0.84 | 33.97 | 96.03 | 101.60 | 130.00 | 224.95 | 35.34 | 114.29 | 59.87 | 23.89 | 89.10 | 257.90 |
-| kv-fp8 | 8 | ok | 2.73 | 106.84 | 65.48 | 71.76 | 72.37 | 146.61 | 19.83 | 61.84 | 18.29 | 23.89 | 76.60 | 227.30 |
-| kv-fp8 | 16 | ok | 3.96 | 149.51 | 71.63 | 884.51 | 77.77 | 173.42 | 22.43 | 70.49 | 12.62 | 23.89 | 73 | 195 |
+| Config | C | Status | Req/s | Tok/s (median) | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Flags | Mem peak GB | Util % | Power W |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 1 | ok | 0.35 | 16.25 | 108.66 | 109.56 | 72.13 | 143.13 | 20.18 | 61.13 | 141.33 | output-token-shortfall | 23.89 | 93.80 | 240.60 |
+| baseline | 4 | ok | 0.77 | 37.14 | 94.48 | 100.82 | 119.62 | 242.15 | 35.62 | 112.95 | 65.13 | output-token-shortfall | 23.89 | 91.50 | 263 |
+| baseline | 8 | ok | 2.54 | 127.67 | 65.16 | 84.10 | 68.76 | 137.02 | 19.80 | 60.39 | 19.66 | output-token-shortfall | 23.89 | 80.90 | 229.50 |
+| baseline | 16 | ok | 3.91 | 171.65 | 71.67 | 509.46 | 83.56 | 156.61 | 21.89 | 68.45 | 12.79 | output-token-shortfall | 23.89 | 72.30 | 208.60 |
+| kv-fp8 | 1 | ok | 0.36 | 13.40 | 112.93 | 113.76 | 72.78 | 170.93 | 20.16 | 60.95 | 138.23 | output-token-shortfall | 23.89 | 94.30 | 238.20 |
+| kv-fp8 | 4 | ok | 0.84 | 33.97 | 96.03 | 101.60 | 130.00 | 224.95 | 35.34 | 114.29 | 59.87 | output-token-shortfall | 23.89 | 89.10 | 257.90 |
+| kv-fp8 | 8 | ok | 2.73 | 106.84 | 65.48 | 71.76 | 72.37 | 146.61 | 19.83 | 61.84 | 18.29 | output-token-shortfall | 23.89 | 76.60 | 227.30 |
+| kv-fp8 | 16 | ok | 3.96 | 149.51 | 71.63 | 884.51 | 77.77 | 173.42 | 22.43 | 70.49 | 12.62 | output-token-shortfall | 23.89 | 73 | 195 |
 
 ## M3 · cyankiwi/Qwen3.8-27B-AWQ-INT4
 
-| Config | C | Status | Req/s | Tok/s | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Mem peak GB | Util % | Power W |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| baseline | 1 | ok | 0.11 | 28.10 | 464.75 | 465.65 | 33.90 | 33.91 | 33.88 | 34.20 | 455.44 | 27.40 | 98.20 | 293.50 |
-| baseline | 4 | ok | 0.24 | 60.65 | 1704.11 | 1708.75 | 57.44 | 62.12 | 57.40 | 57.93 | 211.06 | 27.72 | 97.70 | 292.20 |
-| baseline | 8 | ok | 0.22 | 57.54 | 1777.34 | 3196.94 | 124.16 | 133.21 | 122.82 | 132.23 | 222.46 | 27.72 | 97.30 | 292.70 |
-| baseline | 16 | ok | 0.35 | 88.49 | 2951.56 | 6704.85 | 156.60 | 182.49 | 130.65 | 1171.72 | 144.64 | 27.72 | 96.10 | 288.70 |
-| kv-fp8 | 1 | ok | 0.06 | 14.40 | 514.87 | 521.73 | 86.23 | 86.51 | 85.64 | 87.52 | 889.19 | 27.40 | 98.70 | 215.70 |
-| kv-fp8 | 4 | ok | 0.22 | 56.04 | 1712.49 | 1735.84 | 62.63 | 67.32 | 62.51 | 63.78 | 228.41 | 27.72 | 97.80 | 292.40 |
-| kv-fp8 | 8 | ok | 0.22 | 55.30 | 1784.75 | 3209.43 | 129.11 | 138.16 | 127.89 | 129.33 | 231.46 | 27.72 | 97.30 | 292.10 |
-| kv-fp8 | 16 | ok | 0.36 | 91.57 | 3781.09 | 6741.44 | 146.68 | 158.60 | 136.41 | 478.61 | 139.78 | 27.72 | 96.40 | 288.10 |
+| Config | C | Status | Req/s | Tok/s (median) | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Flags | Mem peak GB | Util % | Power W |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 1 | ok | 0.11 | 28.10 | 464.75 | 465.65 | 33.90 | 33.91 | 33.88 | 34.20 | 455.44 | — | 27.40 | 98.20 | 293.50 |
+| baseline | 4 | ok | 0.24 | 60.65 | 1704.11 | 1708.75 | 57.44 | 62.12 | 57.40 | 57.93 | 211.06 | — | 27.72 | 97.70 | 292.20 |
+| baseline | 8 | ok | 0.22 | 57.54 | 1777.34 | 3196.94 | 124.16 | 133.21 | 122.82 | 132.23 | 222.46 | — | 27.72 | 97.30 | 292.70 |
+| baseline | 16 | ok | 0.35 | 88.49 | 2951.56 | 6704.85 | 156.60 | 182.49 | 130.65 | 1171.72 | 144.64 | — | 27.72 | 96.10 | 288.70 |
+| kv-fp8 | 1 | ok | 0.06 | 14.40 | 514.87 | 521.73 | 86.23 | 86.51 | 85.64 | 87.52 | 889.19 | — | 27.40 | 98.70 | 215.70 |
+| kv-fp8 | 4 | ok | 0.22 | 56.04 | 1712.49 | 1735.84 | 62.63 | 67.32 | 62.51 | 63.78 | 228.41 | — | 27.72 | 97.80 | 292.40 |
+| kv-fp8 | 8 | ok | 0.22 | 55.30 | 1784.75 | 3209.43 | 129.11 | 138.16 | 127.89 | 129.33 | 231.46 | — | 27.72 | 97.30 | 292.10 |
+| kv-fp8 | 16 | ok | 0.36 | 91.57 | 3781.09 | 6741.44 | 146.68 | 158.60 | 136.41 | 478.61 | 139.78 | — | 27.72 | 96.40 | 288.10 |
 
 ## M4 · cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit
 
-| Config | C | Status | Req/s | Tok/s | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Mem peak GB | Util % | Power W |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| baseline | 1 | ok | 0.06 | 14.84 | 157.47 | 333.03 | 71.71 | 71.98 | 71.69 | 72.08 | 862.61 | 27.72 | 99 | 153.50 |
-| baseline | 4 | ok | 0.57 | 146.81 | 312.49 | 319.31 | 25.85 | 27.01 | 26.43 | 27.59 | 87.19 | 28.04 | 94 | 274.50 |
-| baseline | 8 | ok | 0.72 | 185.29 | 343.09 | 575.92 | 40.34 | 41.63 | 40.52 | 43.53 | 69.08 | 28.04 | 91.70 | 269.80 |
-| baseline | 16 | ok | 1.06 | 272.23 | 621.34 | 1140.88 | 53.24 | 54.70 | 52.90 | 117.10 | 47.02 | 28.04 | 88.70 | 262.60 |
-| kv-fp8 | 1 | ok | 0.07 | 16.72 | 155.50 | 335.98 | 74.80 | 75.05 | 74.60 | 75.67 | 765.52 | 27.72 | 98.50 | 156.60 |
-| kv-fp8 | 4 | ok | 0.51 | 130.21 | 313.23 | 320.39 | 29.27 | 30.26 | 29.91 | 31.36 | 98.30 | 28.04 | 94.70 | 259.50 |
-| kv-fp8 | 8 | ok | 0.67 | 170.53 | 362.53 | 601.22 | 43.69 | 45.03 | 44.09 | 47.38 | 75.06 | 28.04 | 94.10 | 264.70 |
-| kv-fp8 | 16 | ok | 0.99 | 252.70 | 665.42 | 1113.53 | 56.19 | 58.13 | 56.45 | 88.28 | 50.65 | 28.04 | 90 | 259 |
+| Config | C | Status | Req/s | Tok/s (median) | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Flags | Mem peak GB | Util % | Power W |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 1 | ok | 0.06 | 14.84 | 157.47 | 333.03 | 71.71 | 71.98 | 71.69 | 72.08 | 862.61 | — | 27.72 | 99 | 153.50 |
+| baseline | 4 | ok | 0.57 | 146.81 | 312.49 | 319.31 | 25.85 | 27.01 | 26.43 | 27.59 | 87.19 | — | 28.04 | 94 | 274.50 |
+| baseline | 8 | ok | 0.72 | 185.29 | 343.09 | 575.92 | 40.34 | 41.63 | 40.52 | 43.53 | 69.08 | — | 28.04 | 91.70 | 269.80 |
+| baseline | 16 | ok | 1.06 | 272.23 | 621.34 | 1140.88 | 53.24 | 54.70 | 52.90 | 117.10 | 47.02 | — | 28.04 | 88.70 | 262.60 |
+| kv-fp8 | 1 | ok | 0.07 | 16.72 | 155.50 | 335.98 | 74.80 | 75.05 | 74.60 | 75.67 | 765.52 | — | 27.72 | 98.50 | 156.60 |
+| kv-fp8 | 4 | ok | 0.51 | 130.21 | 313.23 | 320.39 | 29.27 | 30.26 | 29.91 | 31.36 | 98.30 | — | 28.04 | 94.70 | 259.50 |
+| kv-fp8 | 8 | ok | 0.67 | 170.53 | 362.53 | 601.22 | 43.69 | 45.03 | 44.09 | 47.38 | 75.06 | — | 28.04 | 94.10 | 264.70 |
+| kv-fp8 | 16 | ok | 0.99 | 252.70 | 665.42 | 1113.53 | 56.19 | 58.13 | 56.45 | 88.28 | 50.65 | — | 28.04 | 90 | 259 |
+
+## Data quality
+
+| Cell | Issue | Detail |
+|---|---|---|
+| M1 / baseline | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M1 / kv-fp8 | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M1 / long-context | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M2 / baseline | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M2 / kv-fp8 | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M3 / baseline | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M3 / kv-fp8 | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M4 / baseline | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| M4 / kv-fp8 | **prefix-caching-ON** | server log shows enable_prefix_caching=True — prompt replay across concurrency levels inflates throughput (see 2026-09-08 review) |
+| openai/gpt-oss-20b / baseline C=1 | **output-token-shortfall** | output tokens 2296/12800 (18%) |
+| openai/gpt-oss-20b / baseline C=4 | **output-token-shortfall** | output tokens 2419/12800 (19%) |
+| openai/gpt-oss-20b / baseline C=8 | **output-token-shortfall** | output tokens 2510/12800 (20%) |
+| openai/gpt-oss-20b / baseline C=16 | **output-token-shortfall** | output tokens 2195/12800 (17%) |
+| openai/gpt-oss-20b / kv-fp8 C=1 | **output-token-shortfall** | output tokens 1852/12800 (14%) |
+| openai/gpt-oss-20b / kv-fp8 C=4 | **output-token-shortfall** | output tokens 2034/12800 (16%) |
+| openai/gpt-oss-20b / kv-fp8 C=8 | **output-token-shortfall** | output tokens 1954/12800 (15%) |
+| openai/gpt-oss-20b / kv-fp8 C=16 | **output-token-shortfall** | output tokens 1887/12800 (15%) |

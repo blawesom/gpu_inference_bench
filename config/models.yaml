@@ -4,8 +4,10 @@
 # vLLM v0.28.0 (spike, 2026-09-02, ROCm 7.2.3 target).
 #
 # Conventions:
-#   - config `flags:` map to vLLM CLI args: key `kv-cache-dtype: fp8`
-#     becomes `--kv-cache-dtype fp8`. A `true` value becomes a bare `--flag`.
+#   - `flags:` maps (in common_server, each model, and each config) map to
+#     vLLM CLI args: key `kv-cache-dtype: fp8` becomes `--kv-cache-dtype fp8`.
+#     A `true` value becomes a bare `--flag`. Precedence: common < model <
+#     config.
 #   - a config flag can override a model default (e.g. long-context overrides
 #     max-model-len).
 #   - `max_model_len` here is the BASE context length for baseline / kv-fp8;
@@ -28,6 +30,23 @@ workload:
   endpoint: /v1/chat/completions
   percentile_metrics: "ttft,tpot,itl"
   metric_percentiles: "50,90,99"
+  # ── P0 protocol (2026-09-08 review) ─────────────────────────────────────
+  # Measured passes per (cell, concurrency) with a controlled server restart
+  # between passes; report.py publishes the median + spread. 1 = legacy
+  # single-shot behavior.
+  num_passes: 3
+  # Per-level warmup: before each measured bench, replay the same load shape
+  # (fewer prompts) until NO new kernel JIT compilations appear in the server
+  # log. The 2026-09-03 run logged Triton JIT compilations *during* measured
+  # windows (M3/M4); two in-bench warmups were not enough.
+  warmup_max_passes: 3
+  warmup_prompts: 8
+  # Output-token accounting guard: expected = num_prompts × random_output_len
+  # (ignore_eos pins the length). Below this ratio the level is flagged
+  # output-token-shortfall and an API diagnostic is captured — values are
+  # flagged, never "corrected". The 2026-09-03 M2 (gpt-oss) runs counted
+  # ~17% of expected tokens on all three systems.
+  token_check_threshold: 0.90
 
 # ── Common server settings (applied to every cell) ──────────────────────────
 common_server:
@@ -43,8 +62,15 @@ common_server:
   # (the workload never exceeds 16 in-flight sequences).
   max_num_seqs: 16
   trust_remote_code: true
-  # NOTE: --enable-prefix-caching is intentionally OFF (distorts synthetic
-  # token throughput). Do not enable.
+  # Prefix caching MUST stay OFF: with a fixed-seed workload the same prompts
+  # are replayed at every concurrency level, so the prefix cache poisons
+  # throughput (the 2026-09-03 AMD M2 log shows the hit rate climbing to
+  # 76% at C=16). vLLM v0.28.0 defaults enable_prefix_caching=True and a
+  # comment alone is not a flag, so the disable flag is EMITTED here and
+  # run_matrix.py verifies the effective value in the server log, failing
+  # the cell if it comes back True.
+  flags:
+    no-enable-prefix-caching: true
 
 # ── Per-model optimization configs ──────────────────────────────────────────
 configs:

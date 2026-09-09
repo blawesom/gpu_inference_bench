@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "run_id": "20260905-134350_nvidia-l40",
-  "generated_at": "2026-09-05T15:52:49.275050+00:00",
+  "generated_at": "2026-09-09T13:17:05.347476+00:00",
   "environment": {
     "vendor": "nvidia",
     "gpu": "NVIDIA L40",
@@ -111,8 +111,96 @@
     "bench_rows": 36,
     "skip_rows": 0,
     "fail_rows": 0,
+    "flagged_rows": 8,
     "vllm_version": "0.28.0"
   },
+  "data_quality": [
+    {
+      "cell": "M1 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M1 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M1 / long-context",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M2 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M2 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M3 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M3 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M4 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M4 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=1",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1953/12800 (15%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=4",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2047/12800 (16%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=8",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1921/12800 (15%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=16",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2064/12800 (16%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=1",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1875/12800 (15%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=4",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1977/12800 (15%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=8",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2190/12800 (17%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=16",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1846/12800 (14%)"
+    }
+  ],
   "rows": [
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -134,6 +222,11 @@
       "itl_p50_ms": 22.60130049990039,
       "itl_p90_ms": 22.705257199868356,
       "itl_p99_ms": 23.068517579959007,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 318,
         "duration_s": 317.04,
@@ -147,7 +240,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -169,6 +265,11 @@
       "itl_p50_ms": 25.107070500098416,
       "itl_p90_ms": 25.17433300004086,
       "itl_p99_ms": 25.77975821984637,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 107,
         "duration_s": 106.01,
@@ -182,7 +283,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -204,6 +308,11 @@
       "itl_p50_ms": 25.72431950011378,
       "itl_p90_ms": 25.810431900072217,
       "itl_p99_ms": 27.15796002999923,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 69,
         "duration_s": 68.02,
@@ -217,7 +326,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -239,6 +351,11 @@
       "itl_p50_ms": 27.298221999899397,
       "itl_p90_ms": 27.415592799707156,
       "itl_p99_ms": 106.95319575989289,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 51,
         "duration_s": 50.02,
@@ -252,7 +369,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -274,6 +394,11 @@
       "itl_p50_ms": 22.502363999819863,
       "itl_p90_ms": 22.573989100192193,
       "itl_p99_ms": 22.775468320119217,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 317,
         "duration_s": 316.03,
@@ -287,7 +412,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -309,6 +437,11 @@
       "itl_p50_ms": 25.01002700000754,
       "itl_p90_ms": 25.079145899871946,
       "itl_p99_ms": 25.31927750016166,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 106,
         "duration_s": 105.02,
@@ -322,7 +455,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -344,6 +480,11 @@
       "itl_p50_ms": 25.59127700010322,
       "itl_p90_ms": 25.67233380000289,
       "itl_p99_ms": 26.900394960230187,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 69,
         "duration_s": 68.02,
@@ -357,7 +498,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -379,6 +523,11 @@
       "itl_p50_ms": 27.05245700008163,
       "itl_p90_ms": 27.138136900339305,
       "itl_p99_ms": 99.33792773010283,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 50,
         "duration_s": 49.02,
@@ -392,7 +541,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -414,6 +566,11 @@
       "itl_p50_ms": 22.594609999941895,
       "itl_p90_ms": 22.695455300299727,
       "itl_p99_ms": 23.05249960980291,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 318,
         "duration_s": 317.04,
@@ -427,7 +584,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -449,6 +609,11 @@
       "itl_p50_ms": 25.10439600018799,
       "itl_p90_ms": 25.16825200054882,
       "itl_p99_ms": 25.731684229449456,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 107,
         "duration_s": 106.02,
@@ -462,7 +627,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -484,6 +652,11 @@
       "itl_p50_ms": 25.722715499341575,
       "itl_p90_ms": 25.816686500365904,
       "itl_p99_ms": 27.18230330935512,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 69,
         "duration_s": 68.02,
@@ -497,7 +670,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -519,6 +695,11 @@
       "itl_p50_ms": 27.305124000122305,
       "itl_p90_ms": 27.43391399972097,
       "itl_p99_ms": 120.40381211020758,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 51,
         "duration_s": 50.02,
@@ -532,7 +713,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -554,6 +738,12 @@
       "itl_p50_ms": 6.364989000758214,
       "itl_p90_ms": 6.440035199739214,
       "itl_p99_ms": 18.988388440557173,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1953,
+        "ratio": 0.153,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 66,
         "duration_s": 65.01,
@@ -567,7 +757,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -589,6 +784,12 @@
       "itl_p50_ms": 9.721169500153337,
       "itl_p90_ms": 10.535890399933123,
       "itl_p99_ms": 30.19149491944518,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2047,
+        "ratio": 0.16,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 34,
         "duration_s": 33.01,
@@ -602,7 +803,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -624,6 +830,12 @@
       "itl_p50_ms": 11.642941500213055,
       "itl_p90_ms": 12.77939139999944,
       "itl_p99_ms": 36.04121255031708,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1921,
+        "ratio": 0.15,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 26,
         "duration_s": 25.01,
@@ -637,7 +849,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -659,6 +876,12 @@
       "itl_p50_ms": 13.703769999665383,
       "itl_p90_ms": 15.384266000182834,
       "itl_p99_ms": 45.25704659990873,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2064,
+        "ratio": 0.161,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 23,
         "duration_s": 22.0,
@@ -672,7 +895,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -694,6 +922,12 @@
       "itl_p50_ms": 6.340046500099561,
       "itl_p90_ms": 6.405259499842941,
       "itl_p99_ms": 18.674338000073476,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1875,
+        "ratio": 0.146,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 60,
         "duration_s": 59.01,
@@ -707,7 +941,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -729,6 +968,12 @@
       "itl_p50_ms": 9.689501499906328,
       "itl_p90_ms": 10.520516900669463,
       "itl_p99_ms": 30.139940310327695,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1977,
+        "ratio": 0.154,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 32,
         "duration_s": 31.01,
@@ -742,7 +987,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -764,6 +1014,12 @@
       "itl_p50_ms": 11.595636000038212,
       "itl_p90_ms": 12.738533599804216,
       "itl_p99_ms": 35.58437329028493,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2190,
+        "ratio": 0.171,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 26,
         "duration_s": 25.01,
@@ -777,7 +1033,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -799,6 +1060,12 @@
       "itl_p50_ms": 13.611063999633188,
       "itl_p90_ms": 15.334648600219225,
       "itl_p99_ms": 45.74157171984461,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1846,
+        "ratio": 0.144,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 22,
         "duration_s": 21.01,
@@ -812,7 +1079,12 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -834,6 +1106,11 @@
       "itl_p50_ms": 25.413406499865232,
       "itl_p90_ms": 25.47230890013452,
       "itl_p99_ms": 25.66919699031132,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 363,
         "duration_s": 362.04,
@@ -847,7 +1124,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -869,6 +1149,11 @@
       "itl_p50_ms": 28.498536499682814,
       "itl_p90_ms": 28.573820300425723,
       "itl_p99_ms": 29.235119669365307,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 128,
         "duration_s": 127.01,
@@ -882,7 +1167,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -904,6 +1192,11 @@
       "itl_p50_ms": 29.481603000022005,
       "itl_p90_ms": 29.594496999925468,
       "itl_p99_ms": 31.388896760145148,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 86,
         "duration_s": 85.02,
@@ -917,7 +1210,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -939,6 +1235,11 @@
       "itl_p50_ms": 33.5587925001164,
       "itl_p90_ms": 33.75492649993248,
       "itl_p99_ms": 339.65447594001495,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 66,
         "duration_s": 65.02,
@@ -952,7 +1253,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -974,6 +1278,11 @@
       "itl_p50_ms": 25.32290049975927,
       "itl_p90_ms": 25.380988500455715,
       "itl_p99_ms": 25.515236030059896,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 362,
         "duration_s": 361.05,
@@ -987,7 +1296,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -1009,6 +1321,11 @@
       "itl_p50_ms": 28.289476000281866,
       "itl_p90_ms": 28.359399400596885,
       "itl_p99_ms": 28.551213749560706,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 127,
         "duration_s": 126.01,
@@ -1022,7 +1339,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -1044,6 +1364,11 @@
       "itl_p50_ms": 29.19568299967068,
       "itl_p90_ms": 29.27122210012385,
       "itl_p99_ms": 29.668917899971348,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 85,
         "duration_s": 84.02,
@@ -1057,7 +1382,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -1079,6 +1407,11 @@
       "itl_p50_ms": 33.07026000038604,
       "itl_p90_ms": 33.195586401052424,
       "itl_p99_ms": 339.34704050989296,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 71,
         "duration_s": 70.0,
@@ -1092,7 +1425,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1114,6 +1450,11 @@
       "itl_p50_ms": 8.280312499664433,
       "itl_p90_ms": 8.30596309970133,
       "itl_p99_ms": 8.385162659396885,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 128,
         "duration_s": 127.01,
@@ -1127,7 +1468,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1149,6 +1493,11 @@
       "itl_p50_ms": 11.42750300004991,
       "itl_p90_ms": 11.67095260170754,
       "itl_p99_ms": 11.839305899738974,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 56,
         "duration_s": 55.0,
@@ -1162,7 +1511,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1184,6 +1536,11 @@
       "itl_p50_ms": 14.09084749957401,
       "itl_p90_ms": 14.453913899706095,
       "itl_p99_ms": 14.726723710409715,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 42,
         "duration_s": 41.01,
@@ -1197,7 +1554,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1219,6 +1579,11 @@
       "itl_p50_ms": 17.919042499670468,
       "itl_p90_ms": 18.475047999891103,
       "itl_p99_ms": 110.44505002066217,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 34,
         "duration_s": 33.0,
@@ -1232,7 +1597,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1254,6 +1622,11 @@
       "itl_p50_ms": 8.251746000496496,
       "itl_p90_ms": 8.286685100392788,
       "itl_p99_ms": 8.397285460232524,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 128,
         "duration_s": 127.02,
@@ -1267,7 +1640,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1289,6 +1665,11 @@
       "itl_p50_ms": 11.332730000503943,
       "itl_p90_ms": 11.571516900039569,
       "itl_p99_ms": 11.740788569786673,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 55,
         "duration_s": 54.01,
@@ -1302,7 +1683,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1324,6 +1708,11 @@
       "itl_p50_ms": 13.967366499855416,
       "itl_p90_ms": 14.407361600751756,
       "itl_p99_ms": 14.726765839550353,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 42,
         "duration_s": 41.01,
@@ -1337,7 +1726,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1359,6 +1751,11 @@
       "itl_p50_ms": 17.861112000900903,
       "itl_p90_ms": 18.421007198412553,
       "itl_p99_ms": 111.73508795905946,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 34,
         "duration_s": 33.0,
@@ -1372,7 +1769,10 @@
         "temp_peak_c": null,
         "freq_avg_mhz": null,
         "freq_peak_mhz": null
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     }
   ]
 }

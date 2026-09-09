@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "run_id": "20260903-222650_0x7551",
-  "generated_at": "2026-09-03T23:03:48.088007+00:00",
+  "generated_at": "2026-09-09T13:16:55.864299+00:00",
   "environment": {
     "vendor": "amd",
     "gpu": "0x7551",
@@ -108,8 +108,96 @@
     "bench_rows": 32,
     "skip_rows": 0,
     "fail_rows": 1,
+    "flagged_rows": 8,
     "vllm_version": "0.28.0+rocm723"
   },
+  "data_quality": [
+    {
+      "cell": "M1 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M1 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M1 / long-context",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M2 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M2 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M3 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M3 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M4 / baseline",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "M4 / kv-fp8",
+      "issue": "prefix-caching-ON",
+      "detail": "server log shows enable_prefix_caching=True \u2014 prompt replay across concurrency levels inflates throughput (see 2026-09-08 review)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=1",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2296/12800 (18%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=4",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2419/12800 (19%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=8",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2510/12800 (20%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / baseline C=16",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2195/12800 (17%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=1",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1852/12800 (14%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=4",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 2034/12800 (16%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=8",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1954/12800 (15%)"
+    },
+    {
+      "cell": "openai/gpt-oss-20b / kv-fp8 C=16",
+      "issue": "output-token-shortfall",
+      "detail": "output tokens 1887/12800 (15%)"
+    }
+  ],
   "rows": [
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -131,6 +219,11 @@
       "itl_p50_ms": 53.77136750030331,
       "itl_p90_ms": 53.89864004100673,
       "itl_p99_ms": 54.00287342723459,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 730,
         "duration_s": 729.05,
@@ -140,7 +233,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 189.8,
         "power_peak_w": 205.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -162,6 +258,11 @@
       "itl_p50_ms": 54.71597699215636,
       "itl_p90_ms": 54.8649039643351,
       "itl_p99_ms": 55.45491880562622,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 207,
         "duration_s": 206.01,
@@ -171,7 +272,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 211.4,
         "power_peak_w": 255.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -193,6 +297,11 @@
       "itl_p50_ms": 66.86257701949216,
       "itl_p90_ms": 67.07209410960786,
       "itl_p99_ms": 68.83065552916378,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 142,
         "duration_s": 141.01,
@@ -202,7 +311,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 221.9,
         "power_peak_w": 287.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -224,6 +336,11 @@
       "itl_p50_ms": 72.05741098732688,
       "itl_p90_ms": 72.3044829966966,
       "itl_p99_ms": 166.9490561936982,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 94,
         "duration_s": 93.0,
@@ -233,7 +350,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 209.6,
         "power_peak_w": 302.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -255,6 +375,11 @@
       "itl_p50_ms": 56.32272848743014,
       "itl_p90_ms": 56.78329491056502,
       "itl_p99_ms": 56.977968265418895,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 767,
         "duration_s": 766.05,
@@ -264,7 +389,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 187.0,
         "power_peak_w": 204.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -286,6 +414,11 @@
       "itl_p50_ms": 57.09899100475013,
       "itl_p90_ms": 57.57921409094706,
       "itl_p99_ms": 57.81814561167266,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 216,
         "duration_s": 215.01,
@@ -295,7 +428,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 208.8,
         "power_peak_w": 254.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -317,6 +453,11 @@
       "itl_p50_ms": 69.24075752613135,
       "itl_p90_ms": 69.76301001850516,
       "itl_p99_ms": 70.27864842908457,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 147,
         "duration_s": 146.01,
@@ -326,7 +467,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 219.7,
         "power_peak_w": 293.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -348,6 +492,11 @@
       "itl_p50_ms": 74.16345298406668,
       "itl_p90_ms": 74.69651197316125,
       "itl_p99_ms": 169.43003310996573,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 97,
         "duration_s": 96.01,
@@ -357,7 +506,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 208.3,
         "power_peak_w": 302.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "Qwen/Qwen3.5-9B",
@@ -365,6 +517,7 @@
       "concurrency": null,
       "status": "failed",
       "reason": "engine-startup",
+      "flags": [],
       "completed": null,
       "failed": null,
       "request_throughput": null,
@@ -400,6 +553,12 @@
       "itl_p50_ms": 20.180919993435964,
       "itl_p90_ms": 20.284255273872986,
       "itl_p99_ms": 61.130766198039055,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2296,
+        "ratio": 0.179,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 161,
         "duration_s": 160.01,
@@ -409,7 +568,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 240.6,
         "power_peak_w": 264.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -431,6 +595,12 @@
       "itl_p50_ms": 35.62030498869717,
       "itl_p90_ms": 39.04410779941827,
       "itl_p99_ms": 112.94793984154244,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2419,
+        "ratio": 0.189,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 79,
         "duration_s": 78.01,
@@ -440,7 +610,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 263.0,
         "power_peak_w": 299.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -462,6 +637,12 @@
       "itl_p50_ms": 19.798185967374593,
       "itl_p90_ms": 21.092378010507673,
       "itl_p99_ms": 60.39251362090014,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2510,
+        "ratio": 0.196,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 33,
         "duration_s": 32.0,
@@ -471,7 +652,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 229.5,
         "power_peak_w": 300.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -493,6 +679,12 @@
       "itl_p50_ms": 21.88541501527652,
       "itl_p90_ms": 23.883353010751307,
       "itl_p99_ms": 68.45303006120956,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2195,
+        "ratio": 0.171,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 26,
         "duration_s": 25.0,
@@ -502,7 +694,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 208.6,
         "power_peak_w": 300.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -524,6 +721,12 @@
       "itl_p50_ms": 20.161242980975658,
       "itl_p90_ms": 20.25742563419044,
       "itl_p99_ms": 60.94614399713465,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1852,
+        "ratio": 0.145,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 157,
         "duration_s": 156.01,
@@ -533,7 +736,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 238.2,
         "power_peak_w": 263.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -555,6 +763,12 @@
       "itl_p50_ms": 35.33791395602748,
       "itl_p90_ms": 38.65083470009267,
       "itl_p99_ms": 114.290036288439,
+      "token_check": {
+        "expected": 12800,
+        "actual": 2034,
+        "ratio": 0.159,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 71,
         "duration_s": 70.0,
@@ -564,7 +778,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 257.9,
         "power_peak_w": 299.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -586,6 +805,12 @@
       "itl_p50_ms": 19.831974001135677,
       "itl_p90_ms": 21.39094332815148,
       "itl_p99_ms": 61.83949784724953,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1954,
+        "ratio": 0.153,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 29,
         "duration_s": 28.0,
@@ -595,7 +820,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 227.3,
         "power_peak_w": 300.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "openai/gpt-oss-20b",
@@ -617,6 +847,12 @@
       "itl_p50_ms": 22.4272949853912,
       "itl_p90_ms": 25.037939002504572,
       "itl_p99_ms": 70.48675889382142,
+      "token_check": {
+        "expected": 12800,
+        "actual": 1887,
+        "ratio": 0.147,
+        "flag": "output-token-shortfall"
+      },
       "telemetry": {
         "n_samples": 23,
         "duration_s": 22.0,
@@ -626,7 +862,12 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 195.0,
         "power_peak_w": 303.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": [
+        "output-token-shortfall"
+      ]
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -648,6 +889,11 @@
       "itl_p50_ms": 33.88477649423294,
       "itl_p90_ms": 34.086371486773714,
       "itl_p99_ms": 34.20210207812488,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 482,
         "duration_s": 481.03,
@@ -657,7 +903,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 293.5,
         "power_peak_w": 301.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -679,6 +928,11 @@
       "itl_p50_ms": 57.40358948241919,
       "itl_p90_ms": 57.635831559309736,
       "itl_p99_ms": 57.930773917469196,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 232,
         "duration_s": 231.02,
@@ -688,7 +942,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 292.2,
         "power_peak_w": 300.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -710,6 +967,11 @@
       "itl_p50_ms": 122.82190300174989,
       "itl_p90_ms": 123.206403182121,
       "itl_p99_ms": 132.23026566265617,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 244,
         "duration_s": 243.01,
@@ -719,7 +981,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 292.7,
         "power_peak_w": 301.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -741,6 +1006,11 @@
       "itl_p50_ms": 130.6513404706493,
       "itl_p90_ms": 131.07722609420307,
       "itl_p99_ms": 1171.7232748295646,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 166,
         "duration_s": 165.01,
@@ -750,7 +1020,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 288.7,
         "power_peak_w": 302.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -772,6 +1045,11 @@
       "itl_p50_ms": 85.63613149453886,
       "itl_p90_ms": 87.06115872482769,
       "itl_p99_ms": 87.51545110193547,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 947,
         "duration_s": 946.06,
@@ -781,7 +1059,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 215.7,
         "power_peak_w": 291.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -803,6 +1084,11 @@
       "itl_p50_ms": 62.51167747541331,
       "itl_p90_ms": 63.45915900892578,
       "itl_p99_ms": 63.77713372698053,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 251,
         "duration_s": 250.01,
@@ -812,7 +1098,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 292.4,
         "power_peak_w": 302.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -834,6 +1123,11 @@
       "itl_p50_ms": 127.89154751226306,
       "itl_p90_ms": 128.8835449842736,
       "itl_p99_ms": 129.33435488899704,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 255,
         "duration_s": 254.02,
@@ -843,7 +1137,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 292.1,
         "power_peak_w": 300.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
@@ -865,6 +1162,11 @@
       "itl_p50_ms": 136.40922552440315,
       "itl_p90_ms": 137.58668797672726,
       "itl_p99_ms": 478.61269899469335,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 162,
         "duration_s": 161.01,
@@ -874,7 +1176,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 288.1,
         "power_peak_w": 301.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -896,6 +1201,11 @@
       "itl_p50_ms": 71.6949895140715,
       "itl_p90_ms": 71.91970420535654,
       "itl_p99_ms": 72.07613407692406,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 909,
         "duration_s": 908.06,
@@ -905,7 +1215,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 153.5,
         "power_peak_w": 268.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -927,6 +1240,11 @@
       "itl_p50_ms": 26.43063449067995,
       "itl_p90_ms": 27.27469303063117,
       "itl_p99_ms": 27.593467487604357,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 99,
         "duration_s": 98.01,
@@ -936,7 +1254,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 274.5,
         "power_peak_w": 300.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -958,6 +1279,11 @@
       "itl_p50_ms": 40.519741480238736,
       "itl_p90_ms": 42.42880012607202,
       "itl_p99_ms": 43.53268647391815,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 80,
         "duration_s": 79.01,
@@ -967,7 +1293,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 269.8,
         "power_peak_w": 301.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -989,6 +1318,11 @@
       "itl_p50_ms": 52.89736500708386,
       "itl_p90_ms": 55.072502203984186,
       "itl_p99_ms": 117.09765743871685,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 58,
         "duration_s": 57.0,
@@ -998,7 +1332,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 262.6,
         "power_peak_w": 301.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1020,6 +1357,11 @@
       "itl_p50_ms": 74.60383500438184,
       "itl_p90_ms": 75.37068418459967,
       "itl_p99_ms": 75.66759642329998,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 816,
         "duration_s": 815.05,
@@ -1029,7 +1371,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 156.6,
         "power_peak_w": 248.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1051,6 +1396,11 @@
       "itl_p50_ms": 29.9053690105211,
       "itl_p90_ms": 30.890877975616604,
       "itl_p99_ms": 31.362157907569777,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 110,
         "duration_s": 109.01,
@@ -1060,7 +1410,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 259.5,
         "power_peak_w": 285.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1082,6 +1435,11 @@
       "itl_p50_ms": 44.0919199900236,
       "itl_p90_ms": 46.161268098512664,
       "itl_p99_ms": 47.381156494957395,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 87,
         "duration_s": 86.0,
@@ -1091,7 +1449,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 264.7,
         "power_peak_w": 297.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     },
     {
       "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
@@ -1113,6 +1474,11 @@
       "itl_p50_ms": 56.44607249996625,
       "itl_p90_ms": 58.5999297676608,
       "itl_p99_ms": 88.27572825248353,
+      "token_check": {
+        "expected": 12800,
+        "actual": 12800,
+        "ratio": 1.0
+      },
       "telemetry": {
         "n_samples": 63,
         "duration_s": 62.01,
@@ -1122,7 +1488,10 @@
         "util_peak_pct": 100.0,
         "power_avg_w": 259.0,
         "power_peak_w": 301.0
-      }
+      },
+      "num_passes": 1,
+      "passes_ok": 1,
+      "flags": []
     }
   ]
 }
