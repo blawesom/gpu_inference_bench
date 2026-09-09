@@ -428,10 +428,34 @@ def build() -> str:
 
     # ── power efficiency ───────────────────────────────────────────────────
     L.append("## Power efficiency (output tok/s per watt)\n")
-    L.append("C=16, baseline. AMD/NVIDIA: measured `power_avg_w` over the bench run. "
-             "Intel: no GPU telemetry captured → evaluated at the documented "
-             f"**{INTEL_B70_TDP_W:.0f} W max TDP**, so its values are conservative "
-             "floors.\n")
+    aligned = {k for k in keys
+               for mid in c16
+               if (row(k, mid, "baseline", 16).get("telemetry") or {}).get("window")
+               is not None}
+    if aligned == set(keys):
+        L.append("C=16, baseline. AMD/NVIDIA: `power_avg_w` aligned to the "
+                 "**measured bench window** (last `duration` s of the client "
+                 "wall time) — same window the throughput covers. Energy is "
+                 "**GPU-only** (vendor power sensor), not system energy. "
+                 f"Intel: no GPU telemetry captured → evaluated at the "
+                 f"documented **{INTEL_B70_TDP_W:.0f} W max TDP**, so its "
+                 "values are conservative floors.\n")
+    elif not aligned:
+        L.append("C=16, baseline. AMD/NVIDIA: `power_avg_w` over the **full "
+                 "bench client window** (pre-P1 runs — client startup + "
+                 "warmups + measured + teardown), NOT aligned to the "
+                 "measured window: avg power is under-stated, so these "
+                 "tok/s/W figures are optimistic (an upper bound). Intel: "
+                 f"no GPU telemetry captured → evaluated at the documented "
+                 f"**{INTEL_B70_TDP_W:.0f} W max TDP**, so its values are "
+                 "conservative floors.\n")
+    else:
+        L.append("C=16, baseline. Power window per run: "
+                 + ", ".join(f"{labels[k]} {'aligned' if k in aligned else 'full client window (pre-P1, optimistic)'}"
+                             for k in keys)
+                 + ". Intel: no GPU telemetry captured → "
+                 f"documented **{INTEL_B70_TDP_W:.0f} W max TDP** "
+                 "(conservative floors).\n")
     L.append("| Model | " + " | ".join(labels[k] for k in keys) + " |")
     L.append("|---|" + "---|" * len(keys))
     for slot, mid, _ in MODEL_ORDER:

@@ -49,9 +49,10 @@ except ImportError:  # pragma: no cover - PyYAML ships in the vllm image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
-    from telemetry import TelemetrySampler
-except ImportError:
-    TelemetrySampler = None  # telemetry optional (per-cell GPU metrics → null)
+    from telemetry import TelemetrySampler, align_window
+except ImportError:  # telemetry optional (per-cell GPU metrics → null)
+    TelemetrySampler = None
+    align_window = None
 
 HF_CACHE = os.environ.get("HF_HOME", "/hf-cache")
 HEALTH_PATH = "/health"
@@ -80,6 +81,99 @@ DIAG_PROMPT = (
     "Aim for around four paragraphs. "
     "Do not include any code, and do not use bullet points.")
 DIAG_REQUEST_TIMEOUT = 600  # generous: 256 tokens × 3 requests × model latency
+
+# ── T1 AITER attention: numerical-validity capture ────────────────────────
+# Three fixed prompts (temperature 0, short output) sent to the server on
+# startup for the baseline + aiter-attn cells on AMD. Post-run, token-diff
+# the baseline vs aiter outputs: identical = strong agreement; a few late
+# flips = float-order tolerance; systematic divergence = stop, don't compare.
+AITER_ATTN_CONFIG = "aiter-attn"
+AITER_DIAG_PROMPTS = [
+    "What is the capital of France? Answer in one short sentence.",
+    "List the first five prime numbers, separated by commas. No other text.",
+    "Explain, in two sentences, why the sky is blue. No headings.",
+]
+AITER_DIAG_MAX_TOKENS = 64
+AITER_DIAG_REQUESTS = len(AITER_DIAG_PROMPTS)
+
+
+AITER_EVIDENCE_RE = re.compile(r"aiter", re.I)
+TRITON_FALLBACK_RE = re.compile(r"falling back to triton", re.I)
+BACKEND_OVERRIDE_RE = re.compile(
+    r"Overriding with .* out of potential backends", re.I)
+
+
+def build_server_env(common: dict, model: dict, cfg: dict) -> dict:
+    """Merge the per-layer ``env:`` maps (common < model < cfg) into the env
+    overrides for the server process. String values only (env vars are
+    strings); non-string values are ignored with a warning. An empty result
+    means the server inherits the container env unchanged."""
+    out: dict = {}
+    for layer in (common.get("env"), model.get("env"), cfg.get("env")):
+        for k, v in (layer or {}).items():
+            if not isinstance(v, str):
+                print(f"[env] WARN ignoring non-string env value {k}={v!r}")
+                continue
+            out[k] = v
+    return out
+
+
+def scan_attention_evidence(log_path: Path) -> dict:
+    """T1: capture attention-backend selection evidence from the server log.
+
+    Returns {aiter_lines: [..<=3], triton_fallback: str|None,
+    backend_override: str|None}. Missing log → empty evidence (all None)."""
+    try:
+        text = log_path.read_text(errors="replace")
+    except OSError:
+        return {"aiter_lines": [], "triton_fallback": None,
+                "backend_override": None}
+    lines = text.splitlines()
+    aiter_lines = [l.strip()[:200] for l in lines
+                   if AITER_EVIDENCE_RE.search(l)][:3]
+    trit = next((l.strip()[:200] for l in lines
+                 if TRITON_FALLBACK_RE.search(l)), None)
+    override = next((l.strip()[:200] for l in lines
+                     if BACKEND_OVERRIDE_RE.search(l)), None)
+    return {"aiter_lines": aiter_lines, "triton_fallback": trit,
+            "backend_override": override}
+
+
+def capture_aiter_diag(tag: str, port: int, model_id: str,
+                       out_dir: Path) -> Path:
+    """T1 numerical-validity capture: send the fixed prompts to the running
+    server and save the raw responses. Best-effort: any failure is recorded
+    in the file, never fatal."""
+    import urllib.parse
+    out_path = out_dir / f"diag_aiter_{tag}.json"
+    url = f"http://127.0.0.1:{port}/v1/chat/completions"
+    responses = []
+    for i, prompt in enumerate(AITER_DIAG_PROMPTS):
+        params = json.dumps({
+            "model": model_id,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": AITER_DIAG_MAX_TOKENS,
+            "temperature": 0,
+        })
+        try:
+            req = urllib.request.Request(
+                url, data=params.encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST")
+            with urllib.request.urlopen(
+                    req, timeout=AITER_DIAG_MAX_TOKENS * 5) as r:
+                body = json.loads(r.read())
+            responses.append({"index": i, "prompt": prompt, "raw": body})
+        except Exception as e:
+            responses.append({"index": i, "prompt": prompt,
+                              "error": str(e)[:400]})
+    out_path.write_text(json.dumps(
+        {"tag": tag, "model": model_id,
+         "num_requests": AITER_DIAG_REQUESTS,
+         "max_tokens": AITER_DIAG_MAX_TOKENS, "temperature": 0,
+         "purpose": "T1 numerical-validity: token-diff baseline vs aiter-attn",
+         "responses": responses}, indent=2))
+    return out_path
 
 
 def effective_prefix_caching(log_path: Path) -> bool | None:
@@ -496,6 +590,13 @@ def collect_environment(vendor: str, gpu_index: int | None, gpu: str) -> dict:
         m = re.search(pat, out or "")
         if m:
             env["vram_total_gb"] = round(int(m.group(1)) / 1024 ** 3, 1)
+        # T1: AITER version (best-effort; import can be slow on AMD stack)
+        av = _run_cmd(
+            ["python3", "-c",
+             "import aiter; print(getattr(aiter, '__version__', 'unknown'))"],
+            timeout=120.0)
+        if av:
+            env["stack"]["aiter"] = av.strip().splitlines()[-1]
     elif vendor == "intel":
         devs = _xpu_devices()
         d = None
@@ -721,10 +822,11 @@ def wait_health(port: int, timeout: float,
     return False
 
 
-def start_server(cmd: list[str], log_path: Path) -> subprocess.Popen:
+def start_server(cmd: list[str], log_path: Path,
+                 env: dict | None = None) -> subprocess.Popen:
     log_fh = open(log_path, "w")
     proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT,
-                            start_new_session=True)
+                            start_new_session=True, env=env)
     proc._log_fh = log_fh  # type: ignore[attr-defined]  # keep handle alive
     return proc
 
@@ -811,13 +913,78 @@ def delete_weights(model_id: str) -> bool:
 
 
 # ── Orchestration ────────────────────────────────────────────────────────────
+def _build_telemetry(sampler, samples, wall_s, duration_s,
+                     output_tokens, token_flagged):
+    """P1: telemetry with power/energy aligned to the measured bench window.
+
+    Top-level aggregates (power_avg_w, util, mem, energy_j) are computed
+    over the aligned window; ``full_window`` keeps the pre-alignment values
+    for traceability; raw 1 Hz samples are archived so future re-aggregation
+    is possible. Returns None when the sampler is unavailable or produced
+    no samples.
+    """
+    if sampler is None or not samples:
+        return None
+    window = {
+        "aligned": False, "reason": None,
+        "wall_s": round(wall_s, 2),
+        "measured_window_s": (round(duration_s, 2)
+                              if duration_s is not None else None),
+        "n_samples": len(samples), "n_samples_full": len(samples),
+    }
+    aligned = samples
+    if duration_s is None:
+        window["reason"] = "no-duration"
+    elif align_window is None:
+        window["reason"] = "align-unavailable"
+    else:
+        aligned = align_window(samples, wall_s, duration_s)
+        if aligned is None:
+            window["reason"] = "insufficient-samples"
+        else:
+            window["aligned"] = True
+            window["n_samples"] = len(aligned)
+    base = sampler.aggregate(aligned)
+    if base is None:
+        return None
+    full = sampler.aggregate(samples) or {}
+    telem = dict(base)
+    telem["window"] = window
+    # GPU energy per 1000 output tokens (null on token shortfall flags: a
+    # short run's J/ktok is meaningless; the flag marks the level).
+    e = telem.get("energy_j")
+    telem["energy_j_per_ktok"] = (
+        round(e / (output_tokens / 1000.0), 1)
+        if (e is not None and output_tokens and not token_flagged) else None)
+    telem["full_window"] = {
+        "power_avg_w": full.get("power_avg_w"),
+        "power_peak_w": full.get("power_peak_w"),
+        "energy_j": full.get("energy_j"),
+    }
+    telem["samples"] = samples
+    return telem
+
+
 def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dict,
              results: Path, vendor: str, gpu_index: int | None, concurrencies: list[int],
              start_timeout: int, dry_run: bool) -> dict:
     tag = f"{model_key}_{cfg['name']}"
     port = int(common.get("port", 8000))
     s_cmd = build_server_cmd(model, cfg, common)
+    # T1: env: layers (common < model < cfg) apply to the server process only
+    env_overrides = build_server_env(common, model, cfg)
+    # T1: aiter-attn is AMD-only — explicit skip on other vendors
+    if cfg["name"] == AITER_ATTN_CONFIG and vendor in ("nvidia", "intel"):
+        print(f"[cell {tag}] skipped: aiter-attn is AMD-only (vendor={vendor})")
+        return {"model": model_key, "model_id": model["id"],
+                "config": cfg["name"], "status": "skipped",
+                "reason": "aiter-amd-only", "server_flags": {},
+                "server_env": {}, "server_log": None,
+                "concurrency_results": {}}
     print(f"[cell {tag}] server: {' '.join(s_cmd)}")
+    if env_overrides:
+        print(f"[cell {tag}] server env: "
+              f"{' '.join(f'{k}={v}' for k, v in env_overrides.items())}")
 
     cell: dict = {
         "model": model_key, "model_id": model["id"], "config": cfg["name"],
@@ -831,6 +998,7 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
             **{f.replace("-", "_"): v for f, v in (cfg.get("flags") or {}).items()},
         },
         "server_log": None,
+        "server_env": env_overrides,
         "concurrency_results": {},
     }
     # ── P0-3 protocol: measured passes (with controlled server restarts)
@@ -869,6 +1037,10 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
     cell["server_logs"] = {}
     diag_done = False
     sampler = (TelemetrySampler(vendor, gpu_index) if TelemetrySampler else None)
+    server_env = None
+    if env_overrides:
+        server_env = dict(os.environ)
+        server_env.update(env_overrides)
 
     def _sweep_pass(pass_i: int) -> str | None:
         """Run one full pass (all concurrency levels). Returns an error
@@ -878,7 +1050,7 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
         cell["server_logs"][str(pass_i)] = server_log_i.name
         if pass_i == 1:
             cell["server_log"] = server_log_i.name  # legacy key
-        server_p = start_server(s_cmd, server_log_i)
+        server_p = start_server(s_cmd, server_log_i, env=server_env)
         try:
             if not wait_health(port, start_timeout, proc=server_p):
                 st, reason = parse_skip_reason(server_log_i)
@@ -902,6 +1074,22 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
                 print(f"[cell {tag}] pass {pass_i}: WARN prefix caching is "
                       f"EFFECTIVELY ON — throughput may be inflated by "
                       f"prompt replay across concurrency levels")
+            # T1: capture attention-backend selection evidence (pass 1)
+            if pass_i == 1:
+                cell["server_flags"]["attention_evidence"] = (
+                    scan_attention_evidence(server_log_i))
+                ev = cell["server_flags"]["attention_evidence"]
+                if cfg["name"] == AITER_ATTN_CONFIG:
+                    note = ("; ".join(ev["aiter_lines"]) or
+                            "NO AITER EVIDENCE IN LOG — likely silent "
+                            "fallback to baseline backend")
+                    print(f"[cell {tag}] attention evidence: {note}")
+                if (vendor == "amd"
+                        and cfg["name"] in ("baseline", AITER_ATTN_CONFIG)):
+                    cell["aiter_diag"] = capture_aiter_diag(
+                        tag, port, model["id"], results).name
+                    print(f"[cell {tag}] numerical-validity capture → "
+                          f"{cell['aiter_diag']}")
             print(f"[cell {tag}] pass {pass_i}/{num_passes}: server healthy "
                   f"→ sweeping C={concurrencies}")
             for c in concurrencies:
@@ -948,11 +1136,26 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
                 wall = time.time() - t0
                 if sampler:
                     samples = sampler.stop()
+                # P1: parse the bench JSON first — its `duration` is the
+                # measured window the power samples must be aligned to.
+                bench_raw: dict = {}
+                tc: dict | None = None
+                if proc.returncode == 0 and bench_out.exists():
+                    try:
+                        bench_raw = json.loads(bench_out.read_text())
+                        tc = _check_tokens(bench_raw, workload,
+                                           token_threshold)
+                    except (json.JSONDecodeError, Exception) as e:
+                        print(f"[cell {tag}]   WARN C={c} pass {pass_i}: "
+                              f"bench JSON error: {e}")
                 telem_out = results / \
                     f"telemetry_{tag}_{c}_pass{pass_i}.json"
-                telem = (sampler.aggregate(samples)
-                         if (sampler and samples) else None)
-                if telem_out and telem is not None:
+                telem = _build_telemetry(
+                    sampler, samples, wall,
+                    bench_raw.get("duration") if bench_raw else None,
+                    bench_raw.get("total_output_tokens") if bench_raw else None,
+                    bool(tc and tc.get("flag")))
+                if telem is not None:
                     telem_out.write_text(json.dumps(telem, indent=2))
                 pass_entry: dict = {
                     "pass": pass_i,
@@ -962,7 +1165,7 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
                     "status": "ok", "reason": None,
                     "jit_during_bench": bool(
                         COMPILE_WARN_RE.search(new_log_region(server_log_i, off))),
-                    "token_check": None,
+                    "token_check": tc,
                 }
                 if pass_entry["jit_during_bench"]:
                     print(f"[cell {tag}]   WARN C={c} pass {pass_i}: kernel "
@@ -970,19 +1173,14 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
                 if proc.returncode != 0 or not bench_out.exists():
                     pass_entry["status"] = "failed"
                     pass_entry["reason"] = (proc.stderr or proc.stdout or "")[-400:]
-                else:
-                    raw = json.loads(bench_out.read_text())
-                    # P0-2: output-token accounting guard. Flag only — the
-                    # throughput numbers are NEVER "corrected".
-                    tc = _check_tokens(raw, workload, token_threshold)
-                    pass_entry["token_check"] = tc
-                    if tc and tc.get("flag") and not diag_done:
-                        print(f"[cell {tag}]   output-token shortfall at C={c} "
-                              f"({tc['actual']}/{tc['expected']}) → capturing "
-                              f"API diagnostic")
-                        _diagnose_shortfall(tag, c, port, model["id"],
-                                            workload, results)
-                        diag_done = True
+                elif tc and tc.get("flag") and not diag_done:
+                    # P0-2: flag only — the numbers are NEVER "corrected".
+                    print(f"[cell {tag}]   output-token shortfall at C={c} "
+                          f"({tc['actual']}/{tc['expected']}) → capturing "
+                          f"API diagnostic")
+                    _diagnose_shortfall(tag, c, port, model["id"],
+                                        workload, results)
+                    diag_done = True
                 level["passes"].append(pass_entry)
             return None
         finally:

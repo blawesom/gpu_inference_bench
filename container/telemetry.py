@@ -65,6 +65,41 @@ def _bdf_key(bdf: str) -> tuple:
         return (9999, 9999, 9999, 9999)
 
 
+def energy_joules(samples: list[dict]) -> Optional[float]:
+    """Time-integrated GPU energy, J: Σ P_i · Δt_i over actual sample
+    intervals (left Riemann sum). None if fewer than 2 power samples."""
+    pts = [(s["t"], s["power_w"]) for s in samples
+           if s.get("power_w") is not None and s.get("t") is not None]
+    if len(pts) < 2:
+        return None
+    e = 0.0
+    for (t0, p0), (t1, _p1) in zip(pts, pts[1:]):
+        e += p0 * max(0.0, t1 - t0)
+    return round(e, 1)
+
+
+def align_window(samples: list[dict], wall_s: Optional[float],
+                 window_s: Optional[float]) -> Optional[list[dict]]:
+    """Samples inside the last ``window_s`` seconds of a ``wall_s`` span.
+
+    P1 (2026-09-08 review): the measured bench window is the last
+    ``duration`` seconds of the bench *client* process (client teardown,
+    <~2 s, lands after it); anchoring on the process end is the tightest
+    alignment available from the artifacts. Returns None when the alignment
+    is degenerate (window >= wall, or < 2 samples inside) — the caller then
+    keeps the full window and records the reason.
+    """
+    if not samples or wall_s is None or window_s is None:
+        return None
+    if window_s >= wall_s:
+        return None
+    t0 = samples[0]["t"]
+    lo = t0 + (wall_s - window_s)
+    hi = t0 + wall_s
+    sel = [s for s in samples if lo <= s.get("t", t0) <= hi]
+    return sel if len(sel) >= 2 else None
+
+
 def _run(cmd: list[str], env: dict | None = None, timeout: float = 10.0) -> Optional[str]:
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
@@ -133,6 +168,9 @@ class TelemetrySampler:
             "util_peak_pct": round(max(util), 1) if util else None,
             "power_avg_w": round(sum(power) / len(power), 1) if power else None,
             "power_peak_w": round(max(power), 1) if power else None,
+            # P1: time-integrated GPU energy over the (possibly aligned)
+            # window — vendor power sensor, i.e. GPU-only, not system energy.
+            "energy_j": energy_joules(samples),
             # Additive fields (report.md columns unchanged; the report.json
             # 'telemetry' object simply carries them along).
             "temp_avg_c": round(sum(temp) / len(temp), 1) if temp else None,

@@ -78,7 +78,7 @@ Averages over all baseline cells (4 models × C=1/4/8/16). **p50** = typical req
 
 ## Power efficiency (output tok/s per watt)
 
-C=16, baseline. AMD/NVIDIA: measured `power_avg_w` over the bench run. Intel: no GPU telemetry captured → evaluated at the documented **230 W max TDP**, so its values are conservative floors.
+C=16, baseline. AMD/NVIDIA: `power_avg_w` over the **full bench client window** (pre-P1 runs — client startup + warmups + measured + teardown), NOT aligned to the measured window: avg power is under-stated, so these tok/s/W figures are optimistic (an upper bound). Intel: no GPU telemetry captured → evaluated at the documented **230 W max TDP**, so its values are conservative floors.
 
 | Model | AMD 0x7551 | Intel Arc Pro B70 | NVIDIA L40 |
 |---|---|---|---|

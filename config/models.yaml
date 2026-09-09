@@ -8,6 +8,12 @@
 #     vLLM CLI args: key `kv-cache-dtype: fp8` becomes `--kv-cache-dtype fp8`.
 #     A `true` value becomes a bare `--flag`. Precedence: common < model <
 #     config.
+#   - `env:` maps (same three layers, same precedence, string values only)
+#     set environment variables for the SERVER process only — the bench
+#     client and warmups are unaffected. T1 aiter-attn uses this to select
+#     the attention backend (env-driven in this vLLM/ROCm stack); the
+#     effective env delta is recorded in each cell's manifest and the AITER
+#     version is probed into environment.json (stack.aiter).
 #   - a config flag can override a model default (e.g. long-context overrides
 #     max-model-len).
 #   - `max_model_len` here is the BASE context length for baseline / kv-fp8;
@@ -82,6 +88,21 @@ configs:
   long-context:
     flags:
       max-model-len: 32768
+  aiter-attn:
+    # T1 (2026-09-08 review): ROCm paged attention falls back to Triton on
+    # this stack ("Cannot use ROCm custom paged attention kernel, falling
+    # back to Triton implementation" in the 2026-09-03 server logs).
+    # Enables the AITER unified-attention path. ONLY the attention path
+    # changes vs baseline (same model, flags, workload). AMD only (the
+    # orchestrator auto-skips nvidia/intel), M1 first. Extend to M3/M4 only
+    # after M1 shows a clean AITER selection in the server log plus the
+    # numerical-validity + quality checks passing. The image-shipped AITER
+    # version is recorded in environment.json (stack.aiter) — pin a
+    # specific version only if the first trial is inconclusive.
+    flags: {}
+    env:
+      VLLM_ROCM_USE_AITER: "1"
+      ROCM_AITER_UNIFIED_ATTN: "1"
 
 # ── Model matrix (all must fit the 32 GB floor) ─────────────────────────────
 models:
@@ -91,7 +112,8 @@ models:
     format: bf16
     weights_gb: 19.3
     max_model_len: 8192
-    configs: [baseline, kv-fp8, long-context]
+    # aiter-attn (T1): AMD-only attention-backend trial, M1 first.
+    configs: [baseline, kv-fp8, long-context, aiter-attn]
 
   M2:
     id: openai/gpt-oss-20b

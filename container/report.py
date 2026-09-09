@@ -43,6 +43,7 @@ _PREFIX_CACHE_RE = re.compile(r"enable_prefix_caching=(True|False)")
 BENCH_KEY_MAP: dict[str, str] = {
     "completed":      "completed",
     "failed":         "failed",
+    "total_output_tokens": "total_output_tokens",
     "request_throughput": "request_throughput",
     "output_throughput":  "output_throughput",
     "duration":       "duration_s",
@@ -78,7 +79,8 @@ MODEL_LABELS = [
 # Telemetry fields appended to each per-model row.
 MODEL_TELEM_LABELS = [("mem_peak_gb", "Mem peak GB"),
                       ("util_avg_pct", "Util %"),
-                      ("power_avg_w", "Power W")]
+                      ("power_avg_w", "Power W"),
+                      ("energy_j_per_ktok", "J/ktok")]
 
 # Metadata table for the report header.
 META_COLS = [
@@ -339,6 +341,41 @@ def _data_quality(cells: list[dict], out_dir: Path,
                                   f"({r['token_check']['ratio']:.0%})"
                                   if f == "output-token-shortfall"
                                   else f"see bench_*.json / server logs")})
+    # ── T1: attention-backend evidence (AITER) ─────────────────────────────
+    for cell in cells:
+        cfg = cell.get("config", "")
+        ev = (cell.get("server_flags") or {}).get("attention_evidence") or {}
+        if not ev:
+            continue  # pre-T1 runs have no attention evidence recorded
+        tag = f"{cell.get('model')} / {cfg}"
+        if cfg == "aiter-attn" and not ev.get("aiter_lines"):
+            dq.append({"cell": tag,
+                       "issue": "aiter-unverified",
+                       "detail": "AITER env set but no AITER evidence in "
+                                 "server log — backend may have silently "
+                                 "fallen back; do not compare against "
+                                 "baseline"})
+        if ev.get("triton_fallback") and cfg in ("aiter-attn", "baseline"):
+            issue = ("attention-triton-fallback" if cfg == "aiter-attn"
+                     else "baseline-triton-fallback")
+            detail = ("Triton fallback logged despite AITER env — treat as "
+                      "invalid AITER trial" if cfg == "aiter-attn"
+                      else "baseline falls back to Triton (expected on this "
+                           "stack; it is the T1 comparison baseline)")
+            dq.append({"cell": tag, "issue": issue, "detail": detail})
+    # ── P1: power-window alignment (run-level) ──────────────────────────────
+    telems = [(r.get("telemetry") or {}) for r in rows]
+    if any(t.get("window") is not None for t in telems):
+        dq.append({"cell": None, "issue": "power-window-aligned",
+                   "detail": "power/energy aligned to the measured bench "
+                             "window (last `duration` s of client wall "
+                             "time); energy = GPU-only (vendor power "
+                             "sensor), not system energy"})
+    else:
+        dq.append({"cell": None, "issue": "power-window-legacy",
+                   "detail": "power/energy over the FULL bench client window "
+                             "(pre-P1): avg power under-stated, energy/token "
+                             "over-stated — efficiency figures optimistic"})
     return dq
 
 
@@ -382,7 +419,7 @@ def _build_report(cells: list[dict], out_dir: Path,
     data_quality = _data_quality(cells, out_dir, rows)
     gpu = next((c.get("gpu") for c in cells if c.get("gpu")), None)
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "run_id": run_id or out_dir.name,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "environment": None,
@@ -539,7 +576,8 @@ def _write_md(report: dict, out_dir: Path) -> None:
         L.append("| Cell | Issue | Detail |")
         L.append("|---|---|---|")
         for d in issues:
-            L.append(f"| {d['cell']} | **{d['issue']}** | {d['detail']} |")
+            cell = d.get("cell") or "run"  # run-level entries have no cell
+            L.append(f"| {cell} | **{d['issue']}** | {d['detail']} |")
         if n_off:
             L.append("")
             L.append(f"(prefix caching verified OFF in {n_off} cell(s) — "

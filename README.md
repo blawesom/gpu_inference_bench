@@ -176,8 +176,45 @@ enforces the corrected reference:
   counters incl. reasoning tokens) is captured as `diag_<cell>_<C>.json`.
   Numbers are flagged, **never corrected** — flagged cells are excluded
   from cross-system rankings (`docs/compare_runs.py`).
+- **Power window aligned to the measured window (P1)**: the 1 Hz sampler
+  wraps the whole bench *client* process (startup + warmups + measured +
+  teardown) while `vllm bench serve` throughput covers the measured window
+  only. The telemetry JSON now aligns power/util/mem/energy to the last
+  `duration` seconds of the client wall time (the measured window), keeps
+  the full-client numbers under `full_window`, and archives the raw 1 Hz
+  `samples`. `power_avg_w` is the **aligned** value; `energy_j` = Σ P·Δt is
+  **GPU-only** (vendor power sensor — not system energy); `energy_j_per_ktok`
+  is published per level (null on flagged shortfalls). Pre-P1 runs keep
+  their full-client numbers and get a `power-window-legacy` data-quality
+  line: avg power under-stated → efficiency figures are optimistic.
 
 `--quick` smoke mode runs 1 pass without the external warmup.
+
+### T1 · AITER attention (AMD only)
+
+The Sept 3 AMD run shows ROCm paged attention falling back to Triton. The
+`aiter-attn` config (M1 only) switches the attention path to the AITER
+unified kernel via server-process env vars (`VLLM_ROCM_USE_AITER=1`,
+`ROCM_AITER_UNIFIED_ATTN=1`) — the only difference vs baseline. Non-AMD
+vendors auto-skip (`skipped:aiter-amd-only`).
+
+Per T1 validation criteria (2026-09-08 review), an AITER result is only
+comparable after these **manual gates**:
+
+1. **Backend selection**: `server_flags.attention_evidence` in cells.json
+   — `aiter_lines` must be non-empty; `report.md → Data quality` flags
+   `aiter-unverified` otherwise. The AITER version is in
+   `environment.json → stack.aiter`.
+2. **Numerical validity**: compare `diag_aiter_M1_baseline.json` vs
+   `diag_aiter_M1_aiter-attn.json` (3 fixed prompts, temp 0, 64 tokens).
+   Identical outputs = strong agreement; a few late-token flips =
+   float-order tolerance; systematic divergence = stop, don't compare.
+3. **Quality**: run the fixed representative corpus with the same scoring
+   protocol on both cells; accept only if quality is equivalent (section
+   04 deliverable — no automatic gate in the repo).
+
+M3/M4 are added only after M1 passes all three gates (RDNA4 AITER kernels
+differ from Instinct — no MI300 profiles).
 
 ## Model matrix
 
