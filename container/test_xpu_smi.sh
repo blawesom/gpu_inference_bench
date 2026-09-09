@@ -34,11 +34,11 @@ fi
 DEVICES=()
 for n in "${NODES[@]}"; do DEVICES+=(--device "$n"); done
 
-GROUPS=()
+GROUP_FLAGS=()
 GNAMES=()
 for g in video render; do
     if getent group "$g" >/dev/null 2>&1; then
-        GROUPS+=(--group-add "$g"); GNAMES+=("$g")
+        GROUP_FLAGS+=(--group-add "$g"); GNAMES+=("$g")
     fi
 done
 
@@ -47,19 +47,29 @@ echo "devices: ${NODES[*]}"
 echo "groups:  ${GNAMES[*]:-none}"
 echo
 
-docker run --rm \
-    --entrypoint bash \
-    -v /dev/dri:/dev/dri \
-    "${DEVICES[@]}" \
-    ${GROUPS[@]+"${GROUPS[@]}"} \
-    "$IMAGE" \
-    -c '
-        echo "=== xpu-smi on PATH ==="; command -v xpu-smi || echo MISSING
-        echo
-        echo "=== version ==="; xpu-smi --version 2>&1 | head -3
-        echo
-        echo "=== discovery ==="; xpu-smi discovery 2>&1 | head -8
-        echo
-        echo "=== dump -m power (decisive) ==="
-        xpu-smi dump -d 0 -m power 2>&1
-    '
+TEST_SCRIPT='
+    echo "=== xpu-smi on PATH ==="; command -v xpu-smi || echo MISSING
+    echo
+    echo "=== version ==="; xpu-smi --version 2>&1 | head -3
+    echo
+    echo "=== discovery ==="; xpu-smi discovery 2>&1 | head -8
+    echo
+    echo "=== dump -m power (decisive) ==="
+    xpu-smi dump -d 0 -m power 2>&1
+'
+
+# Build argv explicitly, print it, then exec — so any host-side wrapper or
+# flag-parsing surprise is visible in the output instead of opaque.
+CMD=(docker run --rm
+     --entrypoint bash
+     -v /dev/dri:/dev/dri
+     "${DEVICES[@]}")
+if [[ ${#GROUP_FLAGS[@]} -gt 0 ]]; then CMD+=("${GROUP_FLAGS[@]}"); fi
+CMD+=("$IMAGE" -c "$TEST_SCRIPT")
+
+printf 'cmd:    '
+printf '%q ' "${CMD[@]}"
+echo
+echo
+
+"${CMD[@]}"
