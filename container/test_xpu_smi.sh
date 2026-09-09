@@ -60,14 +60,11 @@ TEST_SCRIPT='
     echo "=== dump --help (syntax discovery) ==="
     xpu-smi dump --help 2>&1
     echo
-    echo "=== candidate: dump 0 -m power (positional device) ==="
-    xpu-smi dump 0 -m power 2>&1
+    echo "=== candidate: 2.1.0 JSON, single sample ==="
+    xpu-smi dump --device 0 --metrics utilization.gpu,memory.used,temperature.gpu,power.draw,clocks.current.graphics -j --number 1 2>&1
     echo
-    echo "=== candidate: dump -d 0 --module power ==="
-    xpu-smi dump -d 0 --module power 2>&1
-    echo
-    echo "=== candidate: monitor (top-level, 3s) ==="
-    timeout 3 xpu-smi monitor -d 0 2>&1 | head -20
+    echo "=== candidate: 2.1.0 JSON, 2 samples 1s apart (power needs a counter delta) ==="
+    xpu-smi dump --device 0 --metrics power.draw -j --number 2 --interval 1 2>&1
 '
 
 # Build argv explicitly, print it, then exec — so any host-side wrapper or
