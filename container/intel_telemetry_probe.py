@@ -50,6 +50,16 @@ def _run(cmd, timeout=15.0):
         return f"[probe error: {e}]"
 
 
+def _run_both(cmd, timeout=15.0):
+    """(stdout, stderr) — for diagnosing why a tool produced no output."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=timeout)
+        return (r.stdout or "").strip(), (r.stderr or "").strip()
+    except Exception as e:  # noqa: BLE001
+        return "", f"[probe error: {e}]"
+
+
 def _read(path):
     try:
         with open(path, errors="replace") as f:
@@ -157,7 +167,36 @@ def probe_sysfs():
                         pass
                     break
         xe.append(entry)
-    return {"xe_cards": xe, "hwmon_devices": hwmon}
+    # Fallback: even when no card is discovered via *_freq_mhz (as on some
+    # Xe2/BM-G kernels), the xe-named hwmon may still expose temperature.
+    # Report it so we know temp is available via sysfs regardless of freq.
+    xe_hwmon_fallback = None
+    if not xe:
+        for h in hwmon:
+            if not h["is_xe"]:
+                continue
+            t = None
+            for a in ("temp1_input", "temp2_input"):
+                v = _read(os.path.join(h["dir"], a))
+                if v is not None:
+                    try:
+                        t = round(int(v) / 1000.0, 1)
+                    except ValueError:
+                        pass
+                    break
+            p = None
+            for a in ("power1_input", "power1_average"):
+                v = _read(os.path.join(h["dir"], a))
+                if v is not None:
+                    try:
+                        p = round(int(v) / 1000.0, 1)
+                    except ValueError:
+                        pass
+                    break
+            xe_hwmon_fallback = {"hwmon": h["dir"], "temp_c": t, "power_w": p}
+            break
+    return {"xe_cards": xe, "xe_hwmon_fallback": xe_hwmon_fallback,
+            "hwmon_devices": hwmon}
 
 
 def probe_tools():
@@ -166,13 +205,23 @@ def probe_tools():
     zeinfo = shutil.which("zeinfo")
     igt = shutil.which("intel_gpu_top")
     if xpu_smi:
+        ver_out, _ = _run_both(["xpu-smi", "--version"])
         d = {"path": xpu_smi,
-             "version": (_run(["xpu-smi", "--version"]).splitlines()[0]
-                         if _run(["xpu-smi", "--version"]) else None)}
-        d["dump_d0_extended"] = _run(
-            ["xpu-smi", "dump", "-d", "0", "-m",
-             "gpu_utilization,mem_used,temperature,power,gpu_frequency"],
-            timeout=20.0)[:2000] or None
+             "version": ver_out.splitlines()[0] if ver_out else None}
+        # Device enumeration (does xpu-smi see a device at all?).
+        d["discovery"] = _run(["xpu-smi", "discovery"], timeout=20.0)[:1200] or None
+        # Full metric set — capture stderr too: a null dump with an error on
+        # stderr usually means a permissions/group problem, not "no metric".
+        ext = (["xpu-smi", "dump", "-d", "0", "-m",
+                "gpu_utilization,mem_used,temperature,power,gpu_frequency"])
+        d["dump_d0_extended"], d["dump_d0_extended_stderr"] = _run_both(ext, 25.0)
+        d["dump_d0_extended"] = d["dump_d0_extended"] or None
+        d["dump_d0_extended_stderr"] = (d["dump_d0_extended_stderr"] or "")[:600] or None
+        # Power alone — isolates whether the 'power' metric is the problem.
+        d["dump_d0_power"], d["dump_d0_power_stderr"] = _run_both(
+            ["xpu-smi", "dump", "-d", "0", "-m", "power"], 25.0)
+        d["dump_d0_power"] = d["dump_d0_power"] or None
+        d["dump_d0_power_stderr"] = (d["dump_d0_power_stderr"] or "")[:600] or None
         detail["xpu-smi"] = d
     if zeinfo:
         detail["zeinfo"] = {"path": zeinfo,
@@ -218,18 +267,26 @@ def probe_live_sampler(gpu_index=None, seconds=5.0):
 
 # ── verdict ─────────────────────────────────────────────────────────────────
 def _xpu_smi_power_works(tools: dict) -> bool:
+    """True if a power-only (or extended) xpu-smi dump returned a number.
+    Prefers the dedicated 'power' dump, falls back to the extended dump."""
     det = (tools.get("detail") or {}).get("xpu-smi") or {}
-    dump = next((v for k, v in det.items() if k.startswith("dump_d")), None)
-    if not dump:
-        return False
-    m = re.search(r"(?<![\w])power[\"':\s]+(\d+(?:\.\d+)?)", dump, re.I)
-    return bool(m) and float(m.group(1)) > 0
+    for key in ("dump_d0_power", "dump_d0_extended"):
+        dump = det.get(key)
+        if not dump:
+            continue
+        m = re.search(r"(?<![\w])power[\"':\s]+(\d+(?:\.\d+)?)", dump, re.I)
+        if m and float(m.group(1)) > 0:
+            return True
+    return False
 
 
 def make_verdict(system, sysfs, tools, live):
     xe = sysfs.get("xe_cards", [])
-    hwmon_power = any(c.get("hwmon_power_w") is not None for c in xe)
-    hwmon_temp = any(c.get("hwmon_temp_c") is not None for c in xe)
+    fb = sysfs.get("xe_hwmon_fallback") or {}
+    hwmon_power = any(c.get("hwmon_power_w") is not None for c in xe) or \
+        fb.get("power_w") is not None
+    hwmon_temp = any(c.get("hwmon_temp_c") is not None for c in xe) or \
+        fb.get("temp_c") is not None
     sysfs_freq = any(any(v is not None for v in (c.get("freq_values_mhz") or []))
                      for c in xe)
     xpu_power = bool(tools.get("xpu-smi")) and _xpu_smi_power_works(tools)
@@ -244,6 +301,13 @@ def make_verdict(system, sysfs, tools, live):
     if live_power and msrc.get("power") not in power_sources:
         power_sources.append(msrc.get("power"))
     power_available = bool(power_sources)
+
+    # Diagnostic: why did xpu-smi's dump come back empty?
+    xs = (tools.get("detail") or {}).get("xpu-smi") or {}
+    xpu_dump_empty = bool(xs) and not xs.get("dump_d0_power") \
+        and not xs.get("dump_d0_extended")
+    xpu_stderr = xs.get("dump_d0_power_stderr") or \
+        xs.get("dump_d0_extended_stderr")
 
     v = {
         "power_available": power_available,
@@ -325,8 +389,20 @@ def main() -> int:
               f"hwmon={c.get('hwmon')}  temp={c.get('hwmon_temp_c')}C  "
               f"power={c.get('hwmon_power_w')}W", file=sys.stderr)
     t = report["tools"]
-    print(f"  tools      : xpu-smi={t['xpu-smi']}  zeinfo={t['zeinfo']}  "
+    xs = t.get("detail", {}).get("xpu-smi") or {}
+    xs_st = xs.get("dump_d0_power_stderr") or xs.get("dump_d0_extended_stderr")
+    xs_dis = xs.get("discovery")
+    xs_ver = xs.get("version")
+    print(f"  tools      : xpu-smi={t['xpu-smi']} ver={xs_ver}  "
           f"intel_gpu_top={t['intel_gpu_top']}", file=sys.stderr)
+    if xs_st:
+        print(f"  xpu-smi    : dump stderr = {xs_st[:300]}", file=sys.stderr)
+    if xs_dis:
+        print(f"  xpu-smi    : discovery = {xs_dis[:300]}", file=sys.stderr)
+    fb = report["sysfs"].get("xe_hwmon_fallback")
+    if fb:
+        print(f"  xe-fallback: hwmon={fb.get('hwmon')}  temp={fb.get('temp_c')}C"
+              f"  power={fb.get('power_w')}W", file=sys.stderr)
     power_str = ('AVAILABLE via ' + ','.join(v['power_sources'])
                  if v['power_available'] else 'NOT AVAILABLE')
     print(f"  power      : {power_str}", file=sys.stderr)
