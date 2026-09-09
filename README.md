@@ -16,7 +16,7 @@ and produces a standalone per-machine report.
 host:  bench.sh
   1. preflight   docker present, vendor detected, disk gates (shared-FS aware)
   2. detect      nvidia-smi / /dev/kfd / xpu-smi / xe module → vendor
-  3. pull        pinned vLLM image (vllm-openai[-rocm|-xpu]:v0.28.0)
+  3. pull        vLLM image (pinned v0.28.0; AMD ROCm runtime variant via --rocm)
   4. docker run  --entrypoint bash <vendor device flags>
         │
 container: container/entrypoint.sh → container/run_matrix.py
@@ -66,6 +66,8 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
 ./bench.sh --concurrency 1,8,16
 ./bench.sh --gpu-index 1       # force a specific physical GPU
 ./bench.sh --vendor amd        # override vendor detection
+./bench.sh --rocm 10           # (amd) test the AMD runtime on ROCm 10 (newest stack)
+./bench.sh                      # (amd) default: pinned v0.28.0 tag (ROCm 7.2.x, Sept 3–5 baseline)
 ./bench.sh --image vllm/vllm-openai:v0.28.0   # override the image
 ./bench.sh --cache-dir /big/disk/hf           # HF weights cache location
 ./bench.sh --results /tmp/out                # output root

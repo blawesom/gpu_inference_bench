@@ -12,7 +12,8 @@
 #   ./bench.sh --delete-weights         # delete weights after each model (old behavior)
 #   ./bench.sh --clean [M1,M2,...]      # remove cached weights, then exit
 #   ./bench.sh --vendor amd             # override vendor detection
-#   ./bench.sh --image <repo:tag>       # override the vLLM image
+#   ./bench.sh --rocm 10               # (amd) test the AMD runtime on ROCm 10 (newest stack)
+#   ./bench.sh --image <repo:tag>       # override the vLLM image entirely
 #   ./bench.sh --build-xpu-tools        # (intel) wrapper image with xpu-smi power telemetry
 #   ./bench.sh --cache-dir /big/hf      # HF weights cache directory
 #   ./bench.sh --validate               # preflight VRAM-fit check (static+live)
@@ -61,8 +62,13 @@ OPTIONS:
   --concurrency <csv>     Concurrency sweep, comma list (e.g. 1,8,16). Default: 1,4,8,16
   --gpu-index <N>         Force a specific physical GPU index (auto-pick by VRAM)
   --vendor <amd|nvidia|intel>   Override GPU vendor auto-detection
+  --rocm <version>              (amd) ROCm runtime image variant (default: latest).
+                                latest (default) = the pinned vllm/vllm-openai-rocm:$VLLM_VERSION
+                                tag (ROCm 7.2.x — the Sept 3–5 baseline); an explicit version
+                                selects the suffixed image, e.g. --rocm 10 →
+                                vllm/vllm-openai-rocm:$VLLM_VERSION-rocm10 (newest ROCm).
   --version <tag>         Override the vLLM version (default v0.28.0)
-  --image <repo:tag>      Override the full vLLM image name
+  --image <repo:tag>      Override the full vLLM image name (bypasses --rocm)
   --build-xpu-tools       (intel) build/reuse wrapper image + xpu-smi for GPU power telemetry
   --cache-dir <dir>       HF weights cache directory (default ./.hf-cache)
   --results <dir>         Output root (default ./results)
@@ -115,6 +121,7 @@ FORCE=0
 IMAGE_OVERRIDE=""
 BUILD_XPU_TOOLS=0
 EXTRA_ENVS=()   # --env KEY=VAL pass-through (repeatable)
+ROCM_VERSION="${ROCM_VERSION:-latest}"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --vendor)        VENDOR="${2:-}"; shift 2 ;;
@@ -137,6 +144,8 @@ while [[ $# -gt 0 ]]; do
         --start-timeout=*) START_TIMEOUT="${1#*=}"; shift ;;
         --results)       RESULTS_DIR="${2:-}"; shift 2 ;;
         --results=*)     RESULTS_DIR="${1#*=}"; shift ;;
+        --rocm)          ROCM_VERSION="${2:-latest}"; shift 2 ;;
+        --rocm=*)        ROCM_VERSION="${1#*=}"; shift ;;
         --version)       VLLM_VERSION="${2:-$VLLM_VERSION}"; shift 2 ;;
         --version=*)     VLLM_VERSION="${1#*=}"; shift ;;
         --image)         IMAGE_OVERRIDE="${2:-}"; shift 2 ;;
@@ -195,7 +204,7 @@ detect_vendor() {
 select_nvidia_gpu() {
     # Only needed for NVIDIA: host has nvidia-smi, so we can pick the largest
     # card and pass --gpus device=N. For AMD the host has no rocm-smi, so the
-    # in-container select_gpu() handles selection.
+    # in-container select_gpu() handles selection (works on any ROCm runtime).
     if [[ -n "$GPU_INDEX" ]]; then
         echo "$GPU_INDEX"; return
     fi
@@ -266,13 +275,20 @@ post_pull_gate() {
 cleanup_stale() {
     # Remove a stale bench container from a crashed prior run.
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-    # Remove stale vllm images, but keep the currently pinned tag (avoid a
-    # ~25 GB re-pull on every re-run).
+    # Remove stale vllm images, but keep the currently used tag(s).
+    # For AMD, the image tag encodes both the vLLM version and the ROCm
+    # version (e.g. v0.28.0-rocm10).  Keep images whose tag starts with
+    # the current VLLM_VERSION so re-runs with the same ROCm pin skip the
+    # ~25 GB re-pull.  Only remove other vllm images (they're ~25 GB each).
     local stale
     stale=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-        | grep '^vllm/vllm-openai' | grep -v ":${VLLM_VERSION}$" || true)
+        | grep '^vllm/vllm-openai' \
+        | grep -v "^vllm/vllm-openai-rocm:${VLLM_VERSION}" \
+        | grep -v "^vllm/vllm-openai:${VLLM_VERSION}" \
+        | grep -v "^vllm/vllm-openai-xpu:${VLLM_VERSION}" \
+        || true)
     if [[ -n "$stale" ]]; then
-        log "removing stale vllm images (keeping :$VLLM_VERSION):"
+        log "removing stale vllm images:"
         echo "$stale" | sed 's/^/    /'
         echo "$stale" | xargs -r docker rmi -f >/dev/null 2>&1 || true
     fi
@@ -290,14 +306,32 @@ if [[ -z "$VENDOR" ]]; then
     VENDOR=$(detect_vendor)
 fi
 case "$VENDOR" in
-    nvidia|amd|intel) log "vendor: $VENDOR (vLLM $VLLM_VERSION)" ;;
+    nvidia) log "vendor: $VENDOR (vLLM $VLLM_VERSION)" ;;
+    amd)
+        if [[ "$ROCM_VERSION" == "latest" ]]; then
+            log "vendor: $VENDOR (vLLM $VLLM_VERSION, ROCm: pinned image)"
+        else
+            log "vendor: $VENDOR (vLLM $VLLM_VERSION, ROCm $ROCM_VERSION)"
+        fi ;;
+    intel)  log "vendor: $VENDOR (vLLM $VLLM_VERSION)" ;;
     *) die "could not detect GPU vendor (nvidia-smi / /dev/kfd / xpu-smi / xe module); pass --vendor" ;;
 esac
 
 # 2. Image
 case "$VENDOR" in
     nvidia) IMAGE="vllm/vllm-openai:${VLLM_VERSION}" ;;
-    amd)    IMAGE="vllm/vllm-openai-rocm:${VLLM_VERSION}" ;;
+    amd)
+        # AMD ROCm image: vllm/vllm-openai-rocm:<vllm>[-rocm<ROCm>]
+        #  - latest (default): the pinned tag, ROCm 7.2.x — the Sept 3–5 baseline
+        #  - explicit version (e.g. --rocm 10): suffixed image with that ROCm
+        #    runtime, e.g. vllm/vllm-openai-rocm:v0.28.0-rocm10 (newest stack)
+        # A full --image override wins (applied below).
+        if [[ "$ROCM_VERSION" == "latest" ]]; then
+            IMAGE="vllm/vllm-openai-rocm:${VLLM_VERSION}"
+        else
+            IMAGE="vllm/vllm-openai-rocm:${VLLM_VERSION}-rocm${ROCM_VERSION}"
+        fi
+        ;;
     intel)  IMAGE="vllm/vllm-openai-xpu:${VLLM_VERSION}" ;;
 esac
 # Tier 2 (docs/intel-telemetry-eval.md): opt-in wrapper image that adds

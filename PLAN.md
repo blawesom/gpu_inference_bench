@@ -106,10 +106,16 @@ exists in all three official repos**, verified on Docker Hub:
 | Vendor | Image                          | Tag       | Size   |
 |--------|--------------------------------|-----------|--------|
 | NVIDIA | `vllm/vllm-openai`             | `v0.28.0` | ~9.7 GB |
-| AMD    | `vllm/vllm-openai-rocm`        | `v0.28.0` | ~11.4 GB |
+| AMD    | `vllm/vllm-openai-rocm`        | `v0.28.0` (default) / `v0.28.0-rocm<ver>` via `--rocm <ver>` | ~11.4 GB |
 | Intel  | `vllm/vllm-openai-xpu`         | `v0.28.0` | ~4.1 GB |
 
 `--image vllm/vllm-openai:v0.28.0` style override allowed, but pinned is the default.
+For AMD the ROCm runtime is selectable via `--rocm <version>` (and the `ROCM_VERSION`
+env var): the default (`latest`) is the pinned tag `vllm/vllm-openai-rocm:${VLLM_VERSION}`
+— the ROCm 7.2.x image used in the Sept 3–5 runs (the T0 baseline). An explicit
+version selects the suffixed image `vllm/vllm-openai-rocm:${VLLM_VERSION}-rocm${ROCM_VERSION}`;
+e.g. `--rocm 10` tests the AMD runtime on the newest ROCm 10 stack (the T5
+"latest/validated stack" axis). `--image` (full image) bypasses `--rocm` entirely.
 (Images are amd64; ARM out of scope.)
 
 Server command shape (inside container):
@@ -429,6 +435,8 @@ set -euo pipefail
 #    stale container/image cleanup
 # 2. host metadata (host OS, docker version, image id) → env for container
 # 3. IMAGE=<(vendor → vllm/vllm-openai[-rocm|-xpu]:$VLLM_VERSION, or --image);
+#    AMD: pinned tag by default (ROCM_VERSION=latest); --rocm <ver> selects the
+#    suffixed image vllm/vllm-openai-rocm:$VLLM_VERSION-rocm$ROCM_VERSION (e.g. rocm10)
 #    docker pull + post-pull disk gate
 # 4. docker run --rm --entrypoint bash (override image ENTRYPOINT ["vllm","serve"]!)
 #    <vendor device flags> -e RUN_ID=<host timestamp>
