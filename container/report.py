@@ -174,6 +174,19 @@ def _read_log_text(path: Path | None) -> str | None:
         return None
 
 
+def _level_has_ok_data(level: dict) -> bool:
+    """True when a level has at least one usable (ok) pass entry.
+
+    Used to decide whether a row under a non-ok cell should keep its per-
+    pass data (partial pass sets are reportable) or reflect the cell-level
+    failure. New layout: level["passes"][*]["status"] == "ok". Legacy:
+    the level's own status. """
+    passes = level.get("passes")
+    if passes is not None:
+        return any(p.get("status") == "ok" for p in passes)
+    return level.get("status", "") in ("ok", "degraded")
+
+
 def _collect_pass_entries(out_dir: Path, level: dict,
                           workload: dict | None) -> list[dict]:
     """Normalize one concurrency level into per-pass metric entries.
@@ -409,7 +422,12 @@ def _build_report(cells: list[dict], out_dir: Path,
                 "model": model, "config": config,
                 "concurrency": int(c_str),
             }
-            if cell_status != "ok":
+            if cell_status not in ("ok", "degraded") \
+                    and not _level_has_ok_data(level):
+                # Cell failed before/during the sweep and this level has no
+                # usable per-pass data → row reflects the cell-level failure.
+                # Levels WITH data (partial pass sets) keep it: their status
+                # + flags describe the partial state.
                 row["status"] = cell_status
                 row["reason"] = cell_reason
                 row["flags"] = []

@@ -1215,6 +1215,27 @@ def run_cell(model_key: str, model: dict, cfg: dict, workload: dict, common: dic
                                    f"{(passes[-1].get('reason') or '')[:120]}")
             else:
                 level["status"], level["reason"] = "ok", None
+        # Cell status is derived from the per-level statuses. The cell is
+        # initialized "failed" — success is NOT the default, so a clean run
+        # must explicitly flip it to "ok" (report.py short-circuits every
+        # row's metrics to None when the cell status is not "ok").
+        levels = cell["concurrency_results"]
+        if levels:
+            lv = {l["status"] for l in levels.values()}
+            if lv == {"ok"}:
+                cell["status"], cell["reason"] = "ok", None
+            elif "failed" in lv:
+                cell["status"] = "failed"
+                if cell["reason"] is None:
+                    bad = next(iter(levels), None)
+                    for k in levels:
+                        if levels[k]["status"] == "failed":
+                            bad = k
+                            break
+                    cell["reason"] = (f"C={bad}: "
+                                      f"{levels[bad].get('reason') or 'failed'}")
+            else:  # only "degraded" levels
+                cell["status"] = "degraded"
     except Exception as e:  # defensive: never lose a cell to an exception
         cell["status"], cell["reason"] = "failed", f"orchestration:{e}"
     return cell
