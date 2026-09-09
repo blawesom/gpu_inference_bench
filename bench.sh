@@ -13,6 +13,7 @@
 #   ./bench.sh --clean [M1,M2,...]      # remove cached weights, then exit
 #   ./bench.sh --vendor amd             # override vendor detection
 #   ./bench.sh --image <repo:tag>       # override the vLLM image
+#   ./bench.sh --build-xpu-tools        # (intel) wrapper image with xpu-smi power telemetry
 #   ./bench.sh --cache-dir /big/hf      # HF weights cache directory
 #   ./bench.sh --validate               # preflight VRAM-fit check (static+live)
 #   ./bench.sh --dry-run                # print the docker command, don't run
@@ -62,6 +63,7 @@ OPTIONS:
   --vendor <amd|nvidia|intel>   Override GPU vendor auto-detection
   --version <tag>         Override the vLLM version (default v0.28.0)
   --image <repo:tag>      Override the full vLLM image name
+  --build-xpu-tools       (intel) build/reuse wrapper image + xpu-smi for GPU power telemetry
   --cache-dir <dir>       HF weights cache directory (default ./.hf-cache)
   --results <dir>         Output root (default ./results)
   --start-timeout <sec>   Server health-wait budget (default 900)
@@ -111,6 +113,7 @@ START_TIMEOUT="${SERVER_START_TIMEOUT:-900}"
 DRY_RUN=0
 FORCE=0
 IMAGE_OVERRIDE=""
+BUILD_XPU_TOOLS=0
 EXTRA_ENVS=()   # --env KEY=VAL pass-through (repeatable)
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -138,6 +141,7 @@ while [[ $# -gt 0 ]]; do
         --version=*)     VLLM_VERSION="${1#*=}"; shift ;;
         --image)         IMAGE_OVERRIDE="${2:-}"; shift 2 ;;
         --image=*)       IMAGE_OVERRIDE="${1#*=}"; shift ;;
+        --build-xpu-tools) BUILD_XPU_TOOLS=1; shift ;;
         --cache-dir)     HF_CACHE_HOST="${2:-}"; shift 2 ;;
         --cache-dir=*)   HF_CACHE_HOST="${1#*=}"; shift ;;
         --dry-run)       DRY_RUN=1; shift ;;
@@ -296,6 +300,29 @@ case "$VENDOR" in
     amd)    IMAGE="vllm/vllm-openai-rocm:${VLLM_VERSION}" ;;
     intel)  IMAGE="vllm/vllm-openai-xpu:${VLLM_VERSION}" ;;
 esac
+# Tier 2 (docs/intel-telemetry-eval.md): opt-in wrapper image that adds
+# xpu-smi — the only GPU power source for Arc B70 on current kernels (the xe
+# hwmon exposes temperature but no power attr, and the official XPU image has
+# no xpu-smi). Intel only; --image override wins.
+if [[ "$BUILD_XPU_TOOLS" == "1" && "$VENDOR" != "intel" ]]; then
+    log "WARN: --build-xpu-tools is intel-only (vendor=$VENDOR) — skipped"
+fi
+if [[ "$VENDOR" == "intel" && "$BUILD_XPU_TOOLS" == "1" && -z "$IMAGE_OVERRIDE" ]]; then
+    TOOLS_IMAGE="gpu-bench/vllm-xpu-tools:${VLLM_VERSION}"
+    if [[ "$DRY_RUN" == "1" ]]; then
+        log "dry-run: would build/reuse $TOOLS_IMAGE"
+    elif docker image inspect "$TOOLS_IMAGE" >/dev/null 2>&1; then
+        log "reusing built image $TOOLS_IMAGE"   # one-off build; docker rmi to rebuild
+    else
+        log "building $TOOLS_IMAGE (one-off: official XPU image + xpu-smi) ..."
+        if ! docker build -f docker/Dockerfile.xpu-tools \
+                --build-arg "BASE=vllm/vllm-openai-xpu:${VLLM_VERSION}" \
+                -t "$TOOLS_IMAGE" .; then
+            die "xpu-tools image build failed — check network access to apt.repos.intel.com (see docker/Dockerfile.xpu-tools fallbacks)"
+        fi
+    fi
+    IMAGE="$TOOLS_IMAGE"
+fi
 [[ -n "$IMAGE_OVERRIDE" ]] && IMAGE="$IMAGE_OVERRIDE"
 log "image: $IMAGE"
 

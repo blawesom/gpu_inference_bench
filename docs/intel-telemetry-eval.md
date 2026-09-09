@@ -200,21 +200,34 @@ A second minimal container (e.g., `ubuntu:24.04` + xpu-smi) with the same DRI mo
 
 **Risk:** low — pure file reads; degrades gracefully; no new runtime dependency.
 
-### Tier 2: opt-in wrapper image (recommended if Tier 1 lacks coverage on the target kernel)
+### Tier 2: opt-in wrapper image (**implemented** — `docker/Dockerfile.xpu-tools`)
 
-If the target B70 host runs a kernel < xe-hwmon (older than ~6.15), Tier 1 sysfs won't expose temperature or power. In that case:
+Triggered by the actual B70 spike: kernel 7.2.3's xe hwmon exposes
+**temperature but no power attribute** for the Arc Pro B70, and the official
+`vllm/vllm-openai-xpu:0.28.0` image ships **no xpu-smi** — so the container
+had no GPU power source at all. xpu-smi is the only power source for this
+card.
 
-- Add `--build-xpu-tools` to `bench.sh` (default: off)
-- On first Intel run with this flag, build a wrapper image (one-off):
-  ```dockerfile
-  FROM vllm/vllm-openai-xpu:0.28.0
-  RUN apt-get update && apt-get install -y intel-xpu-smi intel-gpu-tools
-  ```
-- The built image's ID is recorded in `environment.json` (already supported)
-- Subsequent runs reuse the built image (no rebuild)
-- Also adds `intel-gpu-tools` (for the `intel_gpu_top` i915 fallback, if needed)
+Implementation:
+- `docker/Dockerfile.xpu-tools` — `FROM` the official XPU image, adds
+  `intel-xpu-smi` from Intel's oneAPI apt channel, and ends with a hard check
+  (`command -v xpu-smi && xpu-smi --version`) so a bad package/channel fails
+  the build instead of shipping a silent no-power image. Fallback recipe
+  (XPU-SMI-Lib prebuilt / GitHub) is in the file header.
+- `bench.sh --build-xpu-tools` (intel only, default off): builds
+  `gpu-bench/vllm-xpu-tools:<vllm-version>` on first use, reuses it after;
+  the built image ID lands in `environment.json` via the existing
+  `IMAGE`/`IMAGE_DIGEST` fields (reproducible). `--image` still wins.
 
-**Alternative:** use Option B (runtime `apt-get`) if a full wrapper build is unwanted — documented as a manual escape hatch.
+Usage on the B70 box:
+```bash
+./bench.sh --vendor intel --build-xpu-tools --quick   # build image, smoke-test telemetry
+python3 container/intel_telemetry_probe.py --out intel-spike-container.json  # in-container
+```
+Then a full T0 run: `./bench.sh --vendor intel --build-xpu-tools`.
+
+**Alternative:** runtime `apt-get` (Option B) remains a documented manual
+escape hatch if a prebuilt wrapper is unwanted.
 
 ### Tier 3: optional CPU system metrics
 
@@ -547,7 +560,7 @@ def aggregate(self, samples: list[dict]) -> Optional[dict]:
 |---|---|---|---|
 | **Tier 1: sysfs sampler** (xe-sysfs + xpu-smi fallback) | **done** — implemented in `telemetry.py`; report displays source per metric; `telemetry-missing` flag for zero-telem runs | — | Low |
 | **Spike on B70** (run `container/intel_telemetry_probe.py`) | **pending** — the probe script exists; run on the B70 box (host + in-container) to pin down whether the target kernel exposes power | 10 min | None |
-| **Tier 2: wrapper image build** (`--build-xpu-tools`) | If the spike shows no power from any source | Low (one Dockerfile + bench.sh flag) | Low |
+| **Tier 2: wrapper image** (`docker/Dockerfile.xpu-tools` + `--build-xpu-tools`) | **implemented** — pending build on the B70 box (apt channel not verifiable from this dev machine; build has a hard xpu-smi check) | — | Low |
 | **Tier 3: CPU RAPL** (optional system energy) | Post-launch polish | Low | Low |
 | Reject: sidecar (D), host-side (E), runtime install (B alone) | — | — | — |
 

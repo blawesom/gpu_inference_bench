@@ -1,0 +1,37 @@
+# Tier 2 — vLLM XPU image + xpu-smi (docs/intel-telemetry-eval.md §5)
+#
+# Why: on the Arc Pro B70 target (kernel 7.2.3, xe driver), the xe hwmon
+# device exposes temperature but NO power attribute, and the official
+# vllm/vllm-openai-xpu image does not ship xpu-smi — so the container has
+# no GPU power source at all (the 2026-09-04 Intel run shipped with zero
+# telemetry). xpu-smi is the only working power source for this card.
+#
+# One-off build per vLLM version; the built image's ID is recorded in
+# environment.json (IMAGE / IMAGE_DIGEST), so runs stay reproducible.
+# Build (on the Intel host, from the repo root):
+#   docker build -f docker/Dockerfile.xpu-tools \
+#     --build-arg BASE=vllm/vllm-openai-xpu:0.28.0 \
+#     -t gpu-bench/vllm-xpu-tools:0.28.0 .
+# or simply: ./bench.sh --vendor intel --build-xpu-tools ...
+#
+# Fallback if the apt channel/package is unavailable on the target network:
+#   - XPU-SMI-Lib prebuilt from GitHub releases (Intel-XPU-SDK/XPU-SMI-Lib),
+#     or `apt-get install intel-xpu-smi` from Intel's oneAPI repo after
+#     adjusting the GPG key URL for the distro. Keep the final verification
+#     step below in either case.
+
+ARG BASE=vllm/vllm-openai-xpu:0.28.0
+FROM ${BASE}
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget gnupg ca-certificates \
+    && wget -qO- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SDW-DER-2024.REV \
+        | gpg --dearmor --yes > /usr/share/keyrings/oneapi.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/oneapi.gpg] https://apt.repos.intel.com/oneapi all all" \
+        > /etc/apt/sources.list.d/oneapi.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends intel-xpu-smi \
+    && rm -rf /var/lib/apt/lists/*
+
+# Hard check: fail the build if xpu-smi is missing or non-functional.
+RUN command -v xpu-smi && xpu-smi --version
