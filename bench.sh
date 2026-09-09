@@ -315,9 +315,11 @@ if [[ "$VENDOR" == "intel" && "$BUILD_XPU_TOOLS" == "1" && -z "$IMAGE_OVERRIDE" 
         log "reusing built image $TOOLS_IMAGE"   # one-off build; docker rmi to rebuild
     else
         log "building $TOOLS_IMAGE (one-off: official XPU image + xpu-smi) ..."
+        # Context = docker/ only: the Dockerfile COPYs nothing, and the repo
+        # root context includes .hf-cache (100s of GB) + results/.
         if ! docker build -f docker/Dockerfile.xpu-tools \
                 --build-arg "BASE=vllm/vllm-openai-xpu:${VLLM_VERSION}" \
-                -t "$TOOLS_IMAGE" .; then
+                -t "$TOOLS_IMAGE" docker/; then
             die "xpu-tools image build failed — check network access to apt.repos.intel.com (see docker/Dockerfile.xpu-tools fallbacks)"
         fi
     fi

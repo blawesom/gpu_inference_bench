@@ -8,10 +8,11 @@
 #
 # One-off build per vLLM version; the built image's ID is recorded in
 # environment.json (IMAGE / IMAGE_DIGEST), so runs stay reproducible.
-# Build (on the Intel host, from the repo root):
+# Build (on the Intel host; bench.sh does this automatically, or by hand —
+# note the context is docker/, NOT the repo root, which holds .hf-cache):
 #   docker build -f docker/Dockerfile.xpu-tools \
 #     --build-arg BASE=vllm/vllm-openai-xpu:0.28.0 \
-#     -t gpu-bench/vllm-xpu-tools:0.28.0 .
+#     -t gpu-bench/vllm-xpu-tools:0.28.0 docker/
 # or simply: ./bench.sh --vendor intel --build-xpu-tools ...
 #
 # Fallback if the apt channel/package is unavailable on the target network:
