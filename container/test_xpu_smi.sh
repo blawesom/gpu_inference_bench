@@ -47,10 +47,12 @@ echo "devices: ${NODES[*]}"
 echo "groups:  ${GNAMES[*]:-none}"
 echo
 
-docker run --rm --entrypoint bash "$IMAGE" \
+docker run --rm \
+    --entrypoint bash \
     -v /dev/dri:/dev/dri \
     "${DEVICES[@]}" \
     ${GROUPS[@]+"${GROUPS[@]}"} \
+    "$IMAGE" \
     -c '
         echo "=== xpu-smi on PATH ==="; command -v xpu-smi || echo MISSING
         echo
