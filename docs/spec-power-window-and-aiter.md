@@ -204,7 +204,7 @@ configs:
       ROCM_AITER_UNIFIED_ATTN: "1"
 ```
 
-- Added to **M1's** `configs:` list only (`[baseline, kv-fp8, long-context,
+- Added to **M1's** `configs:` list only (`[baseline, long-context,
   aiter-attn]`). M3/M4 unchanged until the compat gate below passes.
 - **Non-AMD runs**: `run_cell` auto-skips this config with
   `skipped:aiter-amd-only` (explicit in the report, exit code unaffected —

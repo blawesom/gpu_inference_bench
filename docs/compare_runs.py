@@ -34,11 +34,10 @@ SYSTEMS = [
 INTEL_B70_TDP_W = 230.0
 
 CS = [1, 4, 8, 16]
-CONFIGS = ["baseline", "kv-fp8", "long-context"]
+CONFIGS = ["baseline", "long-context"]
 
 MODEL_ORDER = [
     ("M1", "Qwen/Qwen3.5-9B", "dense ~9B, BF16"),
-    ("M2", "openai/gpt-oss-20b", "MoE 21B/3.6B active, MXFP4"),
     ("M3", "cyankiwi/Qwen3.8-27B-AWQ-INT4", "dense 27B, AWQ-4bit"),
     ("M4", "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit", "MoE 35B/3B active, AWQ-4bit"),
 ]
@@ -127,14 +126,6 @@ def scale_c1(mid, k):
     return None
 
 
-def kv_delta(k, mid, c):
-    """kv-fp8 vs baseline output throughput, %."""
-    a, b = row(k, mid, "baseline", c), row(k, mid, "kv-fp8", c)
-    if row_rankable(a) and row_rankable(b):
-        return 100.0 * (b["output_throughput"] - a["output_throughput"]) / a["output_throughput"]
-    return None
-
-
 def lat_mean(k, field):
     """Mean of a latency field over all rankable baseline cells."""
     vals = []
@@ -217,7 +208,7 @@ def build_impact(labels, keys, excluded_models):
              "in-bench Triton JIT stalls* (inflates) — and they roughly cancel, "
              "except where the JIT stall was the dominant legacy defect.\n")
 
-    # rankable model list (drops M2, which is output-token-shortfall everywhere)
+    # rankable model list (drops any model excluded via output-token shortfall)
     rank = [(slot, mid) for slot, mid, _ in MODEL_ORDER
             if slot not in excluded_models]
 
@@ -241,8 +232,9 @@ def build_impact(labels, keys, excluded_models):
                 mark = "†" if _shortfall(n) else ""
                 cells.append(f"{vo:.0f} → {vn:.0f}{mark} ({d:+.0f}%)")
         L.append(f"| {slot} · {mid} | " + " | ".join(cells) + " |")
-    L.append("\n† M2 (gpt-oss-20b) stays output-token-shortfall on all systems and "
-             "remains **excluded** from rankings (Δ shown for reference only).\n")
+    if excluded_models:
+        L.append(f"\n† **Provisional — excluded from rankings** ({', '.join(excluded_models)}): "
+                 "output-token accounting fell below threshold; Δ shown for reference only.\n")
 
     # ── mean efficiency old -> new per card ─────────────────────────────────
     em_old, em_new = {}, {}
@@ -364,8 +356,6 @@ def build() -> str:
     eff_mean = {k: mean([effs[mid][k][0] for mid in c16 if k in effs.get(mid, {})])
                 for k in keys}
 
-    kvd = {k: mean([kv_delta(k, mid, 16) for _, mid, _ in MODEL_ORDER]) for k in keys}
-
     lcx = {}
     m1 = MODEL_ORDER[0][1]
     for k in keys:
@@ -389,7 +379,7 @@ def build() -> str:
     L.append("# Cross-System Performance Comparison\n")
     L.append("gpu_inference_bench — 3 systems, identical workload (random "
              "512-in/256-out tokens, 50 prompts, seed 42, temperature 0, "
-             "C = 1/4/8/16), vLLM v0.28.0, 4-model matrix.\n")
+             "C = 1/4/8/16), vLLM v0.28.0, 3-model matrix.\n")
 
     L.append("## Systems compared\n")
     L.append("| Field | " + " | ".join(labels[k] for k in keys) + " |")
@@ -418,7 +408,7 @@ def build() -> str:
     excl_note = (f" ({', '.join(excluded_models)} excluded: output-token "
                  f"shortfall, see † below)") if excluded_models else ""
     L.append(f"- **{labels[top]} leads output throughput on "
-             f"{'all four models' if (lead_all and not excluded_models) else 'most models'}** at C=16 baseline "
+             f"{'all three models' if (lead_all and not excluded_models) else 'most models'}** at C=16 baseline "
              f"(peak {peak:.0f} tok/s); across the {len(MODEL_ORDER) - len(excluded_models)}-model matrix{excl_note} "
              f"{labels[second]} averages {share[second]:.0%} and "
              f"{labels[third]} {share[third]:.0%} of the leader's throughput.")
@@ -440,12 +430,7 @@ def build() -> str:
              f"{lat['TPOT'][tpot_best][0]:.0f} ms vs {lat['TPOT'][tpot_worst][0]:.0f} ms "
              f"for {labels[tpot_worst]}; tails (mean p99/p50) are tightest on "
              f"{labels[tail_best]} ({tail[tail_best]:.1f}×) and loosest on "
-             f"{labels[tail_worst]} ({tail[tail_worst]:.1f}×).")
-    L.append(f"- **kv-fp8 KV cache is neutral-to-negative on every system** "
-             f"(mean Δ vs baseline @ C=16: "
-             + ", ".join(f"{kvd[k]:+.1f}% {labels[k]}" for k in keys)
-             + ") — the KV cache is not the bottleneck at this workload size "
-             "(~12.3 k KV tokens at C=16).\n")
+             f"{labels[tail_worst]} ({tail[tail_worst]:.1f}×).\n")
 
     # ── performance ────────────────────────────────────────────────────────
     L.append("## Performance\n")
@@ -467,14 +452,11 @@ def build() -> str:
         L.append(f"| {slot} · {mid} | " + " | ".join(cells) + " |")
     if excluded_models:
         L.append("")
-        L.append("† **Provisional — excluded from rankings and derived stats.** "
-                 "Output-token accounting fell below threshold (expected "
-                 "50 × 256 = 12800 tokens): the gpt-oss-20b runs counted "
-                 "~17% of expected output tokens on all three systems "
-                 "(suspected reasoning-token split under the OpenAI chat "
-                 "endpoint). See each run's `report.md → Data quality`; "
-                 "values must not be ranked until diagnosed (2026-09-08 "
-                 "review, P0).")
+        L.append(f"† **Provisional — excluded from rankings and derived stats** "
+                 f"({', '.join(excluded_models)}). Output-token accounting fell "
+                 "below threshold (expected 50 × 256 = 12800 tokens); see each "
+                 "run's `report.md → Data quality`. Values must not be ranked "
+                 "until diagnosed.")
     L.append("")
 
     L.append("### Batch scaling, C=1 → C=16 (baseline throughput ratio)\n")
@@ -486,24 +468,13 @@ def build() -> str:
                               for k in keys) + " |")
     L.append("")
 
-    L.append("### kv-fp8 vs baseline @ C=16 (output throughput %)\n")
-    L.append("| Model | " + " | ".join(labels[k] for k in keys) + " |")
-    L.append("|---|" + "---|" * len(keys))
-    for slot, mid, _ in MODEL_ORDER:
-        cells = []
-        for k in keys:
-            d = kv_delta(k, mid, 16)
-            cells.append(f"{d:+.1f}%" if d is not None else "n/a")
-        L.append(f"| {slot} · {mid} | " + " | ".join(cells) + " |")
-    L.append("")
-
     L.append("### Takeaways\n")
     gap = {mid: min(m.values()) / max(m.values()) for mid, m in c16.items() if m}
     narrow, wide = max(gap, key=gap.get), min(gap, key=gap.get)
     L.append(f"- The cross-system gap is **narrowest on {slot_of(narrow)}** "
              f"({desc_of(narrow)}: last place still at {gap[narrow]:.0%} of best) "
              f"and **widest on {slot_of(wide)}** ({desc_of(wide)}: {gap[wide]:.0%}).")
-    m3 = MODEL_ORDER[2][1]
+    m3 = MODEL_ORDER[1][1]
     s3 = {k: scales[m3][k] for k in keys if scales[m3][k]}
     if s3:
         wk = min(s3, key=s3.get)
@@ -515,7 +486,7 @@ def build() -> str:
                      f"{r16['tpot_p50_ms']:.0f} ms — batch decode degrades under load "
                      "(KV/scheduling pressure on the tight 32 GB fit and/or a ROCm "
                      "batching inefficiency for this checkpoint).")
-    m4 = MODEL_ORDER[3][1]
+    m4 = MODEL_ORDER[2][1]
     for k in keys:
         a, b = row(k, m4, "baseline", 1), row(k, m4, "baseline", 4)
         if a and b and b["output_throughput"] / a["output_throughput"] > 5:
@@ -526,23 +497,6 @@ def build() -> str:
                      "single-stream MoE decode is inefficient on this stack; the "
                      f"{scales[m4][k]:.1f}× C=1→C=16 'scaling' partly reflects this, not "
                      "superlinear batching.")
-    worst_kv16, worst_kv1 = None, None
-    for k in keys:
-        for _, mid, _ in MODEL_ORDER:
-            d16, d1 = kv_delta(k, mid, 16), kv_delta(k, mid, 1)
-            if d16 is not None and (worst_kv16 is None or d16 < worst_kv16[0]):
-                worst_kv16 = (d16, k, mid)
-            if d1 is not None and (worst_kv1 is None or d1 < worst_kv1[0]):
-                worst_kv1 = (d1, k, mid)
-    if worst_kv16 and worst_kv16[0] < 0:
-        d, k, mid = worst_kv16
-        extra = ""
-        if worst_kv1 and worst_kv1[0] < -20:
-            extra = (f" Single-stream is hit even harder: {slot_of(worst_kv1[2])} on "
-                     f"{labels[worst_kv1[1]]} {worst_kv1[0]:+.0f}% @ C=1.")
-        L.append(f"- kv-fp8 hurts **{labels[k]}** most (mean {kvd[k]:+.1f}%), worst cell "
-                 f"{slot_of(mid)} {d:+.1f}% @ C=16.{extra} "
-                 "No system benefits at this workload size.")
     if lcx:
         L.append("- **long-context (32k max-model-len) is a no-op for M1** throughput "
                  "(only model with that cell): "
@@ -554,7 +508,7 @@ def build() -> str:
 
     # ── latency ────────────────────────────────────────────────────────────
     L.append("## Latency (ms)\n")
-    L.append("Averages over all baseline cells (4 models × C=1/4/8/16). "
+    L.append("Averages over all baseline cells (3 models × C=1/4/8/16). "
              "**p50** = typical request, **p99** = worst 1% of requests. "
              "TTFT = time to first token (prefill + queueing); TPOT = per-token "
              "decode latency; ITL = inter-token gap (streaming tail risk).\n")
@@ -570,7 +524,7 @@ def build() -> str:
     ttft1 = [v for v in ((row(k, mid, "baseline", 1) or {}).get("ttft_p50_ms")
                          for k in keys for _, mid, _ in MODEL_ORDER) if v]
     m3tt = [r["ttft_p50_ms"] for k in keys
-            if (r := row(k, MODEL_ORDER[2][1], "baseline", 16))]
+             if (r := row(k, MODEL_ORDER[1][1], "baseline", 16))]
     L.append(f"- **TTFT**: single-stream prefill is fast everywhere (C=1 p50 up to "
              f"{max(ttft1):.0f} ms); under full load (C=16) "
              f"{labels[best_t]} queues fastest ({ttft16[best_t]:.0f} ms mean p50 across "
@@ -660,12 +614,6 @@ def build() -> str:
              "(prefix caching ON, single pass, unaligned power window, no "
              "Intel power telemetry) are **superseded** — see the "
              "\"Protocol change\" section for the effect on their numbers.")
-    L.append("- **M2 (gpt-oss-20b) is excluded on all systems**: "
-             "output-token accounting falls to ~16–19% of the expected "
-             "12 800 tokens (output-token-shortfall) — suspected "
-             "reasoning-token split under the OpenAI chat endpoint. Raw API "
-             "diagnostics are captured (`diag_M2_*.json`). M2 cells are "
-             "excluded from all rankings and derived stats above.")
     # per-card data-quality notes: failed cells + single-pass measurements
     for k in keys:
         rpt = data[k]["rerun"]["report"]
@@ -689,7 +637,7 @@ def build() -> str:
              "remains the AMD attention reference. AITER is AMD-only; the "
              "cell auto-skips on NVIDIA/Intel.")
     L.append("- **VRAM differs**: NVIDIA L40 has 45 GB vs 32 GB on AMD/Intel. "
-             "All four models fit at this workload (~12.3 k KV tokens at "
+             "All three models fit at this workload (~12.3 k KV tokens at "
              "C=16); the extra headroom only matters for long-context cells.")
     L.append("- **Host CPUs differ**: AMD/Intel runs on an AMD Ryzen 7 9800X3D "
              "(consumer), NVIDIA on an Intel Xeon (Sapphire Rapids). Negligible "

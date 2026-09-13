@@ -7,14 +7,13 @@
 # The HF cache structure is:
 #   <cache_dir>/hub/models--<org>--<name>/
 #
-# Model keys (from config/models.yaml): M1 M2 M3 M4
+# Model keys (from config/models.yaml): M1 M3 M4
 #   M1 → Qwen/Qwen3.5-9B
-#   M2 → openai/gpt-oss-20b
 #   M3 → cyankiwi/Qwen3.8-27B-AWQ-INT4
 #   M4 → cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit
 #
 # Usage:
-#   ./clean.sh                        # remove ALL cached weights (~80 GB)
+#   ./clean.sh                        # remove ALL cached weights (~65 GB)
 #   ./clean.sh M3,M4                  # free only M3 + M4 (~45 GB)
 #   ./clean.sh "Qwen/Qwen3.5-9B"      # remove by HuggingFace repo ID
 #   ./clean.sh --dry-run              # preview without deleting
@@ -37,7 +36,7 @@ Weights are kept by default after each benchmark run so re-runs skip the
 re-download; use this to free that disk space.
 
 POSITIONAL:
-  MODELS                Model keys (M1,M2,M3,M4) or HuggingFace repo IDs
+  MODELS                Model keys (M1,M3,M4) or HuggingFace repo IDs
                         (comma-separated). Default: all cached weights.
 
 OPTIONS:
@@ -49,7 +48,7 @@ OPTIONS:
   -h, --help            Show this help and exit
 
 EXAMPLES:
-  ./clean.sh                        # remove all cached weights (~80 GB)
+  ./clean.sh                        # remove all cached weights (~65 GB)
   ./clean.sh M3,M4                  # free only M3 + M4 (~45 GB)
   ./clean.sh "Qwen/Qwen3.5-9B"      # remove by full HuggingFace repo ID
   ./clean.sh --dry-run              # preview without deleting
@@ -57,7 +56,6 @@ EXAMPLES:
 
 MODEL KEYS (from config/models.yaml):
   M1 → Qwen/Qwen3.5-9B
-  M2 → openai/gpt-oss-20b
   M3 → cyankiwi/Qwen3.8-27B-AWQ-INT4
   M4 → cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit
 
@@ -89,7 +87,7 @@ fi
 log() { echo "[clean] $*"; }
 die() { echo "[clean] ERROR: $*" >&2; exit 1; }
 
-# Resolve a model key (M1, M2, ...) or repo ID to the HF dir name.
+# Resolve a model key (M1, M3, ...) or repo ID to the HF dir name.
 resolve_model() {
     local raw="$1"
 
@@ -101,11 +99,11 @@ resolve_model() {
         return
     fi
 
-    # Model key (M1, M2, M3, M4) — look up in models.yaml
+    # Model key (M1, M3, M4) — look up in models.yaml
     local repo_id
     repo_id=$(sed -n "/^  ${raw}:/,/^  [A-Z]/p" "$CONFIG" | grep '^\s*id:' | head -1 | sed 's/.*id:\s*//' | xargs)
     if [[ -z "$repo_id" ]]; then
-        die "unknown model key: $raw (expected M1|M2|M3|M4 or a repo ID)"
+        die "unknown model key: $raw (expected M1|M3|M4 or a repo ID)"
     fi
     local org="${repo_id%%/*}"
     local name="${repo_id#*/}"

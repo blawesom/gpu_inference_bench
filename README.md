@@ -2,7 +2,7 @@
 
 Platform-agnostic GPU inference benchmark. A single shell script (`bench.sh`)
 detects the local GPU (NVIDIA / AMD / Intel), pulls the pinned vLLM image for
-that vendor, runs a 4-model × optimization-config benchmark matrix against it,
+that vendor, runs a 3-model × optimization-config benchmark matrix against it,
 and produces a standalone per-machine report.
 
 - **`PLAN.md`** — the full design (model matrix, optimization configs,
@@ -60,8 +60,8 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
 
 ```bash
 ./bench.sh                     # full matrix, auto-detect GPU (~3.5–4.5 h)
-./bench.sh --quick             # smoke test: M1 only, baseline+kv-fp8, C=1,8
-./bench.sh --models M2,M4      # subset of the matrix
+./bench.sh --quick             # smoke test: M1 only, baseline, C=1,8
+./bench.sh --models M3,M4      # subset of the matrix
 ./bench.sh --configs baseline  # subset of configs
 ./bench.sh --concurrency 1,8,16
 ./bench.sh --gpu-index 1       # force a specific physical GPU
@@ -72,7 +72,7 @@ concurrency sweep, GPU telemetry sampling, aggregation, report rendering.
 ./bench.sh --cache-dir /big/disk/hf           # HF weights cache location
 ./bench.sh --results /tmp/out                # output root
 ./bench.sh --delete-weights                   # delete weights after each model (old behavior)
-./bench.sh --clean [M1,M2,...]                # remove cached weights, then exit
+./bench.sh --clean [M1,M3,...]                # remove cached weights, then exit
 ./bench.sh --start-timeout 1200             # server health-wait budget (s)
 ./bench.sh --validate --models M3,M4        # preflight VRAM-fit check (static+live probe)
 ./bench.sh --dry-run                        # print the docker command, stop
@@ -221,13 +221,12 @@ differ from Instinct — no MI300 profiles).
 
 ## Model matrix
 
-All four models fit the 32 GB floor (weights + KV cache + overhead), which is
+All three models fit the 32 GB floor (weights + KV cache + overhead), which is
 what makes cross-machine results comparable:
 
 | #   | Slot            | Model                              | Format      | On disk |
 |-----|-----------------|------------------------------------|-------------|---------|
 | M1  | dense ~9 B      | `Qwen/Qwen3.5-9B`                  | BF16        | 19.3 GB |
-| M2  | MoE small       | `openai/gpt-oss-20b`               | MXFP4 native| 13.8 GB |
 | M3  | dense 27 B      | `cyankiwi/Qwen3.8-27B-AWQ-INT4`    | 4-bit CT    | 21.0 GB |
 | M4  | MoE 35 B / 3 B active | `cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit` | 4-bit CT  | 24.5 GB |
 
@@ -249,10 +248,9 @@ Per-model optimization configs (one server process each):
 
 | Model | Configs |
 |-------|---------|
-| M1 (dense 9 B) | `baseline` · `kv-fp8` (`--kv-cache-dtype fp8`) · `long-context` (32 k) |
-| M2 (MoE)       | `baseline` · `kv-fp8` |
-| M3 (dense 27 B)| `baseline` · `kv-fp8` (long-context removed: 32 k ctx can't fit on 32 GB) |
-| M4 (MoE 35 B)  | `baseline` · `kv-fp8` |
+| M1 (dense 9 B) | `baseline` · `long-context` (32 k) · `aiter-attn` (AMD-only) |
+| M3 (dense 27 B)| `baseline` (long-context removed: 32 k ctx can't fit on 32 GB) |
+| M4 (MoE 35 B)  | `baseline` |
 
 **Auto-skip:** if a backend rejects a config (e.g. FP8 KV cache unsupported
 on some vendor/stack combos), the server fails to start, the orchestrator
@@ -287,10 +285,9 @@ remains as a **no-op** for backward compatibility.
 | `could not detect GPU vendor` | Install the vendor stack (`nvidia-container-toolkit` / AMD KFD / Intel `xe` module), or pass `--vendor` |
 | `no XPU device visible in the container` | Intel: check the `xe` module is loaded (`lsmod \| grep xe`) and `/dev/dri` exists; `bench.sh --dry-run` should show `-v /dev/dri:/dev/dri` + `--device` per render node (see [intel-xpu-dev-dri](docs/intel-xpu-dev-dri.md) for why both are required). Inside the container, `zeinfo` must list the card |
 | `no NVIDIA GPU found` | Check `nvidia-smi -L`; pass `--gpu-index` to pick a card |
-| disk gate aborts | Weights are kept by default (whole set ≈ 85 GB). Use `--delete-weights` to restore the old one-model-at-a-time footprint, `--cache-dir <bigger volume>`, `./clean.sh` to free space, or `--force` |
-| need to free weight disk | `./clean.sh` (all) or `./clean.sh M1,M2` (specific models) |
+| disk gate aborts | Weights are kept by default (whole set ≈ 72 GB). Use `--delete-weights` to restore the old one-model-at-a-time footprint, `--cache-dir <bigger volume>`, `./clean.sh` to free space, or `--force` |
+| need to free weight disk | `./clean.sh` (all) or `./clean.sh M1,M3` (specific models) |
 | cell `skipped:oom` | Model + graph + profiling exceed the util budget (vLLM v0.28 counts CUDA-graph memory); run `--validate` to see the exact shortfall, raise the model's `gpu_memory_utilization`, lower `max_model_len` / `max-num-batched-tokens`, or add `enforce-eager` as a last resort |
-| cell `skipped:kv-fp8-unsupported` | Expected on backends without FP8 KV in v0.28.0; not a failure |
 | cell `skipped:unsupported:<…>` | Backend rejected the model/quant format (e.g. **GPTQ on ROCm** — see `server_<model>_<config>.log` for the exact weight line). M4 defaults to the AWQ variant for this reason; `--validate` surfaces the exact error |
 | model download fails | Gated repo → set `HF_TOKEN`; network → check HF access |
 | server never healthy | `server_<model>_<config>.log` in the run dir; raise `--start-timeout` for big first loads |

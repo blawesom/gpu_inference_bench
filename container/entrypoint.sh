@@ -11,10 +11,10 @@
 # Environment (set by bench.sh):
 #   GPU_VENDOR      amd | nvidia | intel        (required)
 #   GPU_INDEX       physical index override     (optional)
-#   MODELS          comma list, e.g. M1,M2 or M1-M4   (optional)
+#   MODELS          comma list, e.g. M1,M3 or M1-M4   (optional)
 #   CONFIGS         comma list, e.g. baseline   (optional)
 #   CONCURRENCY     comma list, e.g. 1,8,16     (optional)
-#   QUICK           1 → M1 only, baseline+kv-fp8, C=1,8
+#   QUICK           1 → M1 only, baseline, C=1,8
 #   VALIDATE        1 → run the VRAM-fit validator instead of the matrix
 #   KEEP_WEIGHTS    deprecated no-op (weights are kept by default now)
 #   DELETE_WEIGHTS  1 → delete weights per model (old behavior)
@@ -36,10 +36,10 @@ ENVIRONMENT (required):
 
 ENVIRONMENT (optional):
   GPU_INDEX           physical GPU index override
-  MODELS              comma list (ranges ok), e.g. M1,M2 or M1-M4  (default: all)
+  MODELS              comma list (ranges ok), e.g. M1,M3 or M1-M4  (default: all)
   CONFIGS             comma list, e.g. baseline
   CONCURRENCY         comma list, e.g. 1,8,16
-  QUICK               1 → M1 only, baseline+kv-fp8, C=1,8
+  QUICK               1 → M1 only, baseline, C=1,8
   VALIDATE            1 → run VRAM-fit validator instead of the matrix
   KEEP_WEIGHTS        deprecated no-op (weights kept by default)
   DELETE_WEIGHTS      1 → delete weights per model (old behavior)

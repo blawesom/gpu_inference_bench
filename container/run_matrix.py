@@ -23,7 +23,7 @@ Usage (from entrypoint.sh):
   python3 /bench/container/run_matrix.py \
       --config /bench/config/models.yaml \
       --results /results \
-      --vendor amd [--models M1,M2] [--delete-weights] [--quick]
+      --vendor amd [--models M1,M3] [--delete-weights] [--quick]
 """
 
 from __future__ import annotations
@@ -323,7 +323,7 @@ def build_server_cmd(model: dict, cfg: dict, common: dict) -> list[str]:
     ``no-enable-prefix-caching: true`` — vLLM 0.28.0 defaults to
     enable_prefix_caching=True and the old config only *commented* that it
     was off, so prefix caching was actually ON in the 2026-09-03 run (up to
-    76% hit rate on M2/AMD at C=16). run_matrix.py verifies the effective
+    76% hit rate at C=16). run_matrix.py verifies the effective
     value in the server log and fails the cell if it comes back True.
 
     ``max_num_seqs:`` (model or common) — emitted as ``--max-num-seqs``. The
@@ -750,7 +750,7 @@ def select_gpu(vendor: str, forced_idx: int | None = None) -> int:
 def _expand_model_keys(raw: str, known_keys: list[str]) -> list[str]:
     """Expand a comma-/range-separated model list into concrete keys.
 
-    Supports: ``M1,M2``, ``M1-M4``, ``M2,M3-M4``, ``M4-M2`` (reverse order
+    Supports: ``M1,M3``, ``M1-M4``, ``M3-M4``, ``M4-M1`` (reverse order
     is allowed — it just follows the config's natural order).
     Unknown keys are passed through unchanged.
     """
@@ -788,8 +788,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--gpu-index", type=int, default=None,
                    help="physical GPU index (overrides auto-pick by VRAM)")
     p.add_argument("--models", default=None,
-                   help="comma-/range-separated model list, e.g. M1,M2 or M1-M4")
-    p.add_argument("--configs", default=None, help="comma list, e.g. baseline,kv-fp8")
+                    help="comma-/range-separated model list, e.g. M1,M3 or M1-M4")
+    p.add_argument("--configs", default=None, help="comma list, e.g. baseline,long-context")
     p.add_argument("--concurrency", default=None, help="comma list, e.g. 1,8,16")
     p.add_argument("--keep-weights", action="store_true",
                    help="no-op, kept for backward compatibility "
@@ -800,7 +800,7 @@ def parse_args() -> argparse.Namespace:
                         "the ~20-25 GB re-download). Use clean.sh for a one-shot "
                         "manual cleanup instead.")
     p.add_argument("--quick", action="store_true",
-                   help="M1 only, baseline+kv-fp8, concurrency 1,8")
+                   help="M1 only, baseline, concurrency 1,8")
     p.add_argument("--start-timeout", type=int, default=DEFAULT_START_TIMEOUT,
                    help="server health-wait budget in seconds (default 900)")
     p.add_argument("--dry-run", action="store_true",
@@ -1286,7 +1286,7 @@ def main() -> int:
     if args.quick:
         # Smoke mode: single pass, no external per-level warmup (the
         # in-bench --num-warmups still applies).
-        model_keys, names, concurrencies = ["M1"], ["baseline", "kv-fp8"], [1, 8]
+        model_keys, names, concurrencies = ["M1"], ["baseline"], [1, 8]
         workload["num_passes"] = 1
         workload["warmup_max_passes"] = 0
     else:

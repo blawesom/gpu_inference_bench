@@ -5,12 +5,12 @@
 #
 # Usage:
 #   ./bench.sh                          # full matrix, auto-detect GPU
-#   ./bench.sh --quick                  # M1 only, baseline+kv-fp8, C=1,8
-#   ./bench.sh --models M2 --configs baseline
+#   ./bench.sh --quick                  # M1 only, baseline, C=1,8
+#   ./bench.sh --models M3 --configs baseline
 #   ./bench.sh --concurrency 1,8,16
 #   ./bench.sh --gpu-index 1            # force a specific physical GPU
 #   ./bench.sh --delete-weights         # delete weights after each model (old behavior)
-#   ./bench.sh --clean [M1,M2,...]      # remove cached weights, then exit
+#   ./bench.sh --clean [M1,M3,...]      # remove cached weights, then exit
 #   ./bench.sh --vendor amd             # override vendor detection
 #   ./bench.sh --rocm 10               # (amd) test the AMD runtime on ROCm 10 (newest stack)
 #   ./bench.sh --image <repo:tag>       # override the vLLM image entirely
@@ -55,10 +55,10 @@ Detects the GPU vendor, pulls the pinned vLLM image, and launches the
 container that runs the full model × config matrix.
 
 OPTIONS:
-  --quick                 Smoke test: M1 only, baseline+kv-fp8, C=1,8
+  --quick                 Smoke test: M1 only, baseline, C=1,8
   --models <csv>          Subset of models, comma-/range-separated
-                          (e.g. M2,M4 or M1-M4). Default: all
-  --configs <csv>         Subset of configs, comma list (e.g. baseline,kv-fp8)
+                          (e.g. M3,M4 or M1-M4). Default: all
+  --configs <csv>         Subset of configs, comma list (e.g. baseline,long-context)
   --concurrency <csv>     Concurrency sweep, comma list (e.g. 1,8,16). Default: 1,4,8,16
   --gpu-index <N>         Force a specific physical GPU index (auto-pick by VRAM)
   --vendor <amd|nvidia|intel>   Override GPU vendor auto-detection
@@ -74,7 +74,7 @@ OPTIONS:
   --results <dir>         Output root (default ./results)
   --start-timeout <sec>   Server health-wait budget (default 900)
   --validate              Preflight VRAM-fit check (static estimate + live probe)
-  --clean [M1,M2,...]     Remove cached model weights, then exit (no container)
+  --clean [M1,M3,...]     Remove cached model weights, then exit (no container)
   --delete-weights        Delete weights after each model (old behavior; off by default
                           so re-runs skip the ~20-25 GB re-download)
   --keep-weights          Deprecated no-op (weights are kept by default now)
@@ -95,7 +95,7 @@ ENVIRONMENT OVERRIDES:
 EXAMPLES:
   ./bench.sh                          # full matrix, auto-detect GPU
   ./bench.sh --quick                  # smoke test (M1, ~5 min)
-  ./bench.sh --models M2,M4           # subset of models (comma list)
+  ./bench.sh --models M3,M4           # subset of models (comma list)
   ./bench.sh --models M3-M4           # range: M3, M4
   ./bench.sh --validate --models M3,M4  # preflight VRAM-fit check
   ./bench.sh --clean M3,M4            # free M3+M4 weights, then exit
@@ -166,7 +166,7 @@ done
 # must reserve room for the whole weight set. --delete-weights restores the
 # old one-model-at-a-time footprint.
 if [[ "$DELETE_WEIGHTS" != "1" ]]; then
-    NEED_MODEL_GB=85   # M1+M2+M3+M4 ≈ 78.6 GB + headroom (kept on disk)
+    NEED_MODEL_GB=72   # M1+M3+M4 ≈ 64.8 GB + headroom (kept on disk)
 fi
 
 # ── helpers ──────────────────────────────────────────────────────────────────

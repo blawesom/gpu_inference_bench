@@ -2,7 +2,7 @@
 
 > **Deliverable:** A single shell script (`bench.sh`) that detects the local GPU
 > (NVIDIA / AMD / Intel), pulls the pinned vLLM image for that vendor, runs the
-> inference stack and the benchmark for a 4-model × per-model-optimizations
+> inference stack and the benchmark for a 3-model × per-model-optimizations
 > matrix, and produces a structured report.
 
 ---
@@ -133,7 +133,7 @@ vllm serve <HF_MODEL> \
 
 ## 5. Model Matrix (target VRAM: 32–40 GB) — latest generations (Sept 2026)
 
-All 4 models must fit the **smallest target card (32 GB)** — weights + KV cache
+All 3 models must fit the **smallest target card (32 GB)** — weights + KV cache
 + overhead — so results are comparable across the whole fleet. (40 GB cards
 simply get more KV headroom.) This forces quantized checkpoints for the
 25–35 B class. Verified on HuggingFace today (on-disk sizes measured from the
@@ -142,16 +142,17 @@ repos' safetensors):
 | # | Slot            | Model (HF repo)                                   | Format        | On disk | KV headroom @32 GB (0.90 util) | Gated |
 |---|-----------------|---------------------------------------------------|---------------|---------|--------------------------------|-------|
 | M1 | dense ~8–9 B   | `Qwen/Qwen3.5-9B` (9.65 B)                        | BF16          | 19.3 GB | ~9.5 GB  | no (12.6 M dl) |
-| M2 | MoE small      | `openai/gpt-oss-20b` (21 B total / 3.6 B active)   | MXFP4 native  | 13.8 GB | ~15 GB   | no |
 | M3 | dense 25–30 B  | `Qwen3.8-27B` AWQ (27.8 B, newest 27 B gen)        | AWQ 4-bit     | 21.0 GB  | ~7.8 GB | no (1.08 M dl) |
 | M4 | MoE 25–35 B    | `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` (35.95 B / 3 B active, official) | GPTQ 4-bit | 24.4 GB | ~4.4 GB | no (491 k dl) |
+
+> **M2 (openai/gpt-oss-20b) was dropped from the matrix (2026-09-13).** It
+> suffered output-token accounting shortfall on all three systems (suspected
+> reasoning-token split under the OpenAI chat endpoint), so its throughput
+> numbers were unreliable for ranking. See the v3.9 change log below.
 
 Selection rationale (latest generation, Sept 2026):
 - **M1:** `Qwen3.5-9B` is the newest Qwen dense in the 8–9 B class (Qwen3.5 gen).
   BF16; on 32 GB leaves ~9.5 GB KV headroom, on 40 GB ~16.7 GB.
-- **M2:** no *newer* small MoE exists in 2026 (Nemotron small MoE = 4 B, too
-  small; Qwen3.8-Flash-Next = 180 B, too big). `gpt-oss-20b` remains the small-MoE
-  reference and keeps vLLM first-class native-format support.
 - **M3:** the newest 27 B dense is `Qwen/Qwen3.8-27B` (5 M dl). Its official
   FP8 (27.8 GB) leaves **no** KV room on 32 GB → use the 4-bit AWQ:
   default `cyankiwi/Qwen3.8-27B-AWQ-INT4` (21.0 GB, 1.08 M dl). (AMD's
@@ -193,19 +194,16 @@ concurrency sweep. Matrix defined in `config/models.yaml`:
 
 | Model | Configs tested |
 |-------|----------------|
-| M1 Qwen3.5-9B (dense)       | `baseline` · `kv-fp8` (`--kv-cache-dtype fp8`) · `long-context` (`--max-model-len 32768`, chunked prefill default on) |
-| M2 gpt-oss-20b (MoE)        | `baseline` · `kv-fp8` |
-| M3 Qwen3.8-27B-AWQ (dense)  | `baseline` · `kv-fp8` · `long-context` |
-| M4 Qwen3.5-35B-A3B-GPTQ (MoE) | `baseline` · `kv-fp8` |
+| M1 Qwen3.5-9B (dense)       | `baseline` · `long-context` (`--max-model-len 32768`, chunked prefill default on) · `aiter-attn` (AMD-only) |
+| M3 Qwen3.8-27B-AWQ (dense)  | `baseline` |
+| M4 Qwen3.5-35B-A3B-GPTQ (MoE) | `baseline` |
 
 Speculative decoding is **not tested.** MTP is model-specific (`qwen3_5_mtp`,
-`deepseek_mtp`, …) and unsupported for every matrix model in v0.28.0 — gpt-oss
-`GptOssForCausalLM` has no MTP handler (`--speculative-config.method mtp` →
-`NotImplementedError` at arg validation, verified in spike) and the Qwen3.5-35B
-base has no MTP head (`num_nextn_predict_layers` absent from config.json). The
-only generic method, `ngram`, was verified working in the spike but is not a
-meaningful perf axis on the random workload, so the MoE models run
-`baseline · kv-fp8` only.
+`deepseek_mtp`, …) and unsupported for every matrix model in v0.28.0 — the
+Qwen3.5-35B base has no MTP head (`num_nextn_predict_layers` absent from
+config.json). The only generic method, `ngram`, was verified working in the
+spike but is not a meaningful perf axis on the random workload, so the MoE
+models run `baseline` only.
 
 - **Auto-skip semantics:** if the vendor backend rejects a config (e.g. FP8 KV
   cache not supported on XPU/ROCm in v0.28.0, MTP kernel unavailable), the server
@@ -244,9 +242,9 @@ for model in M1..M4:
 
 ### Total run estimate (full matrix = default)
 
-13 (model,config) cells × (model load ~2–8 min + 4-level sweep ~10–15 min)
-≈ **3.5–4.5 h** per machine — this is the **default**. `--quick` (M1 only,
-baseline + kv-fp8, 2 concurrency levels) remains for pre-flight / smoke tests.
+5 (model,config) cells × (model load ~2–8 min + 4-level sweep ~10–15 min)
+≈ **1.5–2.5 h** per machine — this is the **default**. `--quick` (M1 only,
+baseline, 2 concurrency levels) remains for pre-flight / smoke tests.
 
 ---
 
@@ -284,7 +282,7 @@ vllm bench serve \
 - 50 prompts/level, **`--num-warmups 2`** for load stabilization (flag verified
   available in v0.28.0; warmup requests are excluded from the reported metrics)
 - `--ignore-eos` + `temperature 0` → fixed 256-token outputs for stable tok/s
-- Workload shape identical across all 4 models and all vendors (comparability)
+- Workload shape identical across all 3 models and all vendors (comparability)
 - `--input-len/--output-len` and `--num-prompts` overridable via CLI/env
 
 **Metrics per cell × concurrency** (from `vllm bench serve` JSON — actual v0.28.0 keys, captured in spike):
@@ -364,13 +362,12 @@ failing.
   "models": {
     "M1": {"id": "Qwen/Qwen3.5-9B", "class": "dense-9b", "format": "bf16",
            "weights_gb": 19.3, "max_model_len": 8192,
-           "configs": ["baseline", "kv-fp8", "long-context"]},
-    "M2": {"id": "openai/gpt-oss-20b", "...": "..."},
+           "configs": ["baseline", "long-context", "aiter-attn"]},
     "M3": {"id": "cyankiwi/Qwen3.8-27B-AWQ-INT4", "...": "..."},
     "M4": {"id": "Qwen/Qwen3.5-35B-A3B-GPTQ-Int4", "...": "..."}
   },
-  "metadata": {"gpu": "NVIDIA GeForce RTX 4090", "total_cells": 13, "total_rows": 52,
-               "bench_rows": 50, "skip_rows": 2, "fail_rows": 0, "vllm_version": "0.28.0"},
+  "metadata": {"gpu": "NVIDIA GeForce RTX 4090", "total_cells": 5, "total_rows": 20,
+               "bench_rows": 19, "skip_rows": 1, "fail_rows": 0, "vllm_version": "0.28.0"},
   "rows": [
     {
       "model": "Qwen/Qwen3.5-9B", "config": "baseline", "concurrency": 8,
@@ -413,7 +410,6 @@ config × concurrency, columns = status + latency/throughput + GPU telemetry:
 | Config | C | Status | Req/s | Tok/s | TTFT p50 | TTFT p99 | TPOT p50 | TPOT p99 | ITL p50 | ITL p99 | Dur s | Mem peak GB | Util % | Power W |
 |--------|---|--------|-------|-------|----------|----------|----------|----------|---------|---------|-------|-------------|--------|---------|
 | baseline | 1 | ok | 0.15 | 37 | 38 ms | 71 ms | ... |
-| kv-fp8   | 1 | skipped: kv-fp8-unsupported | n/a | n/a | ... |
 ```
 
 ---
@@ -425,7 +421,7 @@ config × concurrency, columns = status + latency/throughput + GPU telemetry:
 set -euo pipefail
 
 # Flags:
-#   --models M1,M2,M3,M4 | --configs baseline,kv-fp8,long-context | --concurrency 1,4,8,16
+#   --models M1,M3,M4 | --configs baseline,long-context | --concurrency 1,4,8,16
 #   --image <override>   --vendor <nvidia|amd|intel>              --quick
 #   --delete-weights (default: keep weights for re-runs; clean.sh to free disk)
 #   --cache-dir <dir>    --results <dir>  --gpu-index N  --start-timeout S
@@ -485,7 +481,7 @@ to free disk) ·
 power metrics **best-effort** (null when the vendor tool lacks them) ·
 per-machine standalone reports (no cross-run diff mode) ·
 **MTP dropped** — not supported for any matrix model in v0.28.0 (spike); the
-two MoE models run **`baseline · kv-fp8` only** (no speculative decoding — `ngram`
+MoE model (M4) runs **`baseline` only** (no speculative decoding — `ngram`
 was benchmarked in the spike but is not a meaningful perf axis on the random
 workload) · **M3 `long-context` dropped** (32 k ctx can't fit a 21 GB model on
 32 GB; M1 keeps it) · **`--validate` preflight** (static estimate + live
@@ -531,3 +527,5 @@ before a full ~4 h run.
 *v3.7 — 2026-09-03 (live ROCm 7.2.3 validation, 32 GB card 0x7551, run 20260902-220721. **M3** `skipped:oom` root cause: vLLM v0.28.0 counts CUDA-graph memory against `--gpu-memory-utilization` (default since v0.21.0), so 21 GB weights + ~4.5–7 GB graph/profiling at 8192 ctx exceeds the 0.90×31.9 GB=28.7 GB budget → `Available KV cache memory: −X GiB` → `No available memory for the cache blocks`. Fix: model-level `gpu_memory_utilization 0.95` + `max_model_len 2048` (workload needs 768) + `max-num-batched-tokens 2048`; `long-context` dropped (32 k ctx cannot fit on 32 GB). **M4** `skipped:unsupported:<…>` root cause: GPTQ-Int4 is not supported by the vLLM ROCm backend (server rejects GPTQ attention/expert weights at load). Fix: M4 → `cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit` (same compressed-tensors int4 family as M3; GPTQ id kept as NVIDIA-only comment). New **`--validate` preflight** (`container/validate_fit.py`): static HF-based estimate (hybrid-GDN KV aware) + live server probe that parses vLLM's own sizing lines for a definitive FIT/TIGHT/NO-FIT/UNSUPPORTED verdict; overhead auto-calibrated from the previous run's telemetry. `run_matrix.build_server_cmd` gains model-level `flags` + `gpu_memory_utilization` override (common < model < config). `gpu_name()` strips rocm-smi's raw `Card Model:` prefix. Milestone 11 done.)*
 *
 *v3.8 — 2026-09-03 (weight retention for faster re-runs. Weights are now KEPT in the HF cache after each model (re-runs skip the ~20–25 GB re-download); `--keep-weights` is a deprecated no-op. New **`clean.sh`** host script removes cached weights: `./clean.sh` (all), `./clean.sh M3,M4` (by key), or by HuggingFace repo ID; `--dry-run` previews. **`bench.sh --clean [M1,M2,...]`** is a thin wrapper (cleans + exits, no container). **`bench.sh --delete-weights`** restores the old per-model deletion (peak disk back to ~40 GB). Disk gate is now dynamic: NEED_MODEL_GB=85 (keep, whole weight set) by default, 30 (delete-weights). `run_matrix` takes `--delete-weights` and sets `weights_removed:false` in cells by default. Milestone 12 done.)*
+*
+*v3.9 — 2026-09-13 (matrix reduced to 3 models: **M2 (openai/gpt-oss-20b) and the `kv-fp8` config are dropped.** M2's output-token accounting fell to ~15–20% of expected on all three systems (suspected reasoning-token split under the OpenAI chat endpoint), so its throughput was unreliable for ranking; kv-fp8 was neutral-to-negative everywhere and is no longer a matrix axis. Matrix is now M1/M3/M4 with configs M1=`baseline·long-context·aiter-attn`, M3=`baseline`, M4=`baseline`. `--quick` runs M1 `baseline` @ C=1,8. Disk gate lowered to NEED_MODEL_GB=72 (M1+M3+M4 ≈ 64.8 GB). Updated `config/models.yaml`, `container/run_matrix.py`, `bench.sh`, `clean.sh`, `container/entrypoint.sh`, `container/validate_fit.py`, `README.md`, `docs/compare_runs.py`, `docs/budget-performance-recommendation.md`; regenerated `docs/cross-system-comparison.md`.)*

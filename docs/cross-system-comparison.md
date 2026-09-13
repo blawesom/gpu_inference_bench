@@ -1,6 +1,6 @@
 # Cross-System Performance Comparison
 
-gpu_inference_bench — 3 systems, identical workload (random 512-in/256-out tokens, 50 prompts, seed 42, temperature 0, C = 1/4/8/16), vLLM v0.28.0, 4-model matrix.
+gpu_inference_bench — 3 systems, identical workload (random 512-in/256-out tokens, 50 prompts, seed 42, temperature 0, C = 1/4/8/16), vLLM v0.28.0, 3-model matrix.
 
 ## Systems compared
 
@@ -17,10 +17,9 @@ gpu_inference_bench — 3 systems, identical workload (random 512-in/256-out tok
 
 ## Executive summary
 
-- **NVIDIA L40 leads output throughput on most models** at C=16 baseline (peak 706 tok/s); across the 3-model matrix (M2 excluded: output-token shortfall, see † below) Intel Arc Pro B70 averages 71% and AMD 0x7551 47% of the leader's throughput.
+- **NVIDIA L40 leads output throughput on all three models** at C=16 baseline (peak 706 tok/s); across the 3-model matrix Intel Arc Pro B70 averages 71% and AMD 0x7551 47% of the leader's throughput.
 - **NVIDIA L40 is also the most power-efficient**: 1.71 mean output tok/s per watt @ C=16 vs 1.45 (Intel Arc Pro B70) and 0.81 (AMD 0x7551) — 2.1× the slowest. All three systems use measured power in the aligned window.
 - **NVIDIA L40 has the lowest decode latency**: mean TPOT p50 23 ms vs 60 ms for AMD 0x7551; tails (mean p99/p50) are tightest on AMD 0x7551 (1.4×) and loosest on Intel Arc Pro B70 (1.6×).
-- **kv-fp8 KV cache is neutral-to-negative on every system** (mean Δ vs baseline @ C=16: -4.9% AMD 0x7551, -0.9% Intel Arc Pro B70, +1.0% NVIDIA L40) — the KV cache is not the bottleneck at this workload size (~12.3 k KV tokens at C=16).
 
 ## Performance
 
@@ -29,41 +28,27 @@ gpu_inference_bench — 3 systems, identical workload (random 512-in/256-out tok
 | Model | AMD 0x7551 | Intel Arc Pro B70 | NVIDIA L40 |
 |---|---|---|---|
 | M1 · Qwen/Qwen3.5-9B | 277.8 (68%) | 345.8 (85%) | 406.2 (100%) |
-| M2 · openai/gpt-oss-20b | 142.1† | 157.3† | 225.9† |
 | M3 · cyankiwi/Qwen3.8-27B-AWQ-INT4 | 93.1 (33%) | 183.0 (66%) | 278.7 (100%) |
 | M4 · cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit | 273.2 (39%) | 431.7 (61%) | 706.1 (100%) |
-
-† **Provisional — excluded from rankings and derived stats.** Output-token accounting fell below threshold (expected 50 × 256 = 12800 tokens): the gpt-oss-20b runs counted ~17% of expected output tokens on all three systems (suspected reasoning-token split under the OpenAI chat endpoint). See each run's `report.md → Data quality`; values must not be ranked until diagnosed (2026-09-08 review, P0).
 
 ### Batch scaling, C=1 → C=16 (baseline throughput ratio)
 
 | Model | AMD 0x7551 | Intel Arc Pro B70 | NVIDIA L40 |
 |---|---|---|---|
 | M1 · Qwen/Qwen3.5-9B | 14.7× | 10.1× | 9.3× |
-| M2 · openai/gpt-oss-20b | n/a | n/a | n/a |
 | M3 · cyankiwi/Qwen3.8-27B-AWQ-INT4 | 3.3× | 6.8× | 7.3× |
 | M4 · cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit | 16.4× | 9.3× | 6.1× |
-
-### kv-fp8 vs baseline @ C=16 (output throughput %)
-
-| Model | AMD 0x7551 | Intel Arc Pro B70 | NVIDIA L40 |
-|---|---|---|---|
-| M1 · Qwen/Qwen3.5-9B | -5.5% | -1.0% | +0.3% |
-| M2 · openai/gpt-oss-20b | n/a | n/a | n/a |
-| M3 · cyankiwi/Qwen3.8-27B-AWQ-INT4 | -1.8% | -0.8% | +1.7% |
-| M4 · cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit | -7.3% | -1.0% | +1.1% |
 
 ### Takeaways
 
 - The cross-system gap is **narrowest on M1** (dense ~9B, BF16: last place still at 68% of best) and **widest on M3** (dense 27B, AWQ-4bit: 33%).
 - **AMD 0x7551 barely scales on M3**: 3.3× from C=1 to C=16 (28 → 93 tok/s) while TPOT p50 climbs 34 → 144 ms — batch decode degrades under load (KV/scheduling pressure on the tight 32 GB fit and/or a ROCm batching inefficiency for this checkpoint).
 - **AMD 0x7551 M4 single-stream anomaly**: 16.7 tok/s at C=1 vs 147.6 at C=4 (9× step) — single-stream MoE decode is inefficient on this stack; the 16.4× C=1→C=16 'scaling' partly reflects this, not superlinear batching.
-- kv-fp8 hurts **AMD 0x7551** most (mean -4.9%), worst cell M4 -7.3% @ C=16. No system benefits at this workload size.
 - **long-context (32k max-model-len) is a no-op for M1** throughput (only model with that cell): Intel Arc Pro B70 -0.0%, NVIDIA L40 -0.4% vs baseline @ C=16 — expected, since the workload still sends 512-token prompts and only the supported context window grows (AMD's M1 long-context run failed at engine startup; see caveats).
 
 ## Latency (ms)
 
-Averages over all baseline cells (4 models × C=1/4/8/16). **p50** = typical request, **p99** = worst 1% of requests. TTFT = time to first token (prefill + queueing); TPOT = per-token decode latency; ITL = inter-token gap (streaming tail risk).
+Averages over all baseline cells (3 models × C=1/4/8/16). **p50** = typical request, **p99** = worst 1% of requests. TTFT = time to first token (prefill + queueing); TPOT = per-token decode latency; ITL = inter-token gap (streaming tail risk).
 
 | Metric | AMD 0x7551 p50 | AMD 0x7551 p99 | Intel Arc Pro B70 p50 | Intel Arc Pro B70 p99 | NVIDIA L40 p50 | NVIDIA L40 p99 |
 |---|---|---|---|---|---|---|
@@ -84,7 +69,6 @@ C=16, baseline. AMD 0x7551: aligned to the measured window, measured · Intel Ar
 | Model | AMD 0x7551 | Intel Arc Pro B70 | NVIDIA L40 |
 |---|---|---|---|
 | M1 · Qwen/Qwen3.5-9B | 1.19 (233 W) | 1.53 (226 W) | 1.43 (284 W) |
-| M2 · openai/gpt-oss-20b | n/a | n/a | n/a |
 | M3 · cyankiwi/Qwen3.8-27B-AWQ-INT4 | 0.31 (299 W) | 0.82 (222 W) | 0.94 (298 W) |
 | M4 · cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit | 0.93 (294 W) | 1.98 (218 W) | 2.77 (255 W) |
 | **Overall (mean)** | **0.81** | **1.45** | **1.71** |
@@ -103,12 +87,8 @@ The original runs used the legacy protocol (prefix caching **ON**, single measur
 | Model | AMD 0x7551 | Intel Arc Pro B70 | NVIDIA L40 |
 |---|---|---|---|
 | M1 · Qwen/Qwen3.5-9B | 174 → 278 (+60%) | 345 → 346 (+0%) | 407 → 406 (-0%) |
-| M2 · openai/gpt-oss-20b | 172 → 142† (-17%) | 228 → 157† (-31%) | 271 → 226† (-17%) |
 | M3 · cyankiwi/Qwen3.8-27B-AWQ-INT4 | 88 → 93 (+5%) | 182 → 183 (+0%) | 279 → 279 (-0%) |
 | M4 · cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit | 272 → 273 (+0%) | 425 → 432 (+2%) | 706 → 706 (-0%) |
-
-† M2 (gpt-oss-20b) stays output-token-shortfall on all systems and remains **excluded** from rankings (Δ shown for reference only).
-
 ### Mean power efficiency (tok/s/W @ C=16, rankable models), original → re-run
 
 | Card | original | re-run | Δ | power (orig → re-run) |
@@ -136,8 +116,7 @@ The original runs used the legacy protocol (prefix caching **ON**, single measur
 ## Caveats
 
 - **Protocol (P0/P1/T1) now enforced**: prefix caching OFF (verified per cell), per-level warmup until no JIT, 3-pass median, and power/energy aligned to the measured bench window (GPU-only, vendor power sensor). The Sept 3–5 legacy runs (prefix caching ON, single pass, unaligned power window, no Intel power telemetry) are **superseded** — see the "Protocol change" section for the effect on their numbers.
-- **M2 (gpt-oss-20b) is excluded on all systems**: output-token accounting falls to ~16–19% of the expected 12 800 tokens (output-token-shortfall) — suspected reasoning-token split under the OpenAI chat endpoint. Raw API diagnostics are captured (`diag_M2_*.json`). M2 cells are excluded from all rankings and derived stats above.
 - **AMD 0x7551 re-run**: **failed cells**: long-context (pass1-failed:engine-startup); **single-pass (not a 3-pass median)**: Qwen3.8-27B-AWQ-INT4.
 - **AITER (T1) M1 on AMD**: the aiter-attn cell failed at engine startup (`pass1-failed:engine-startup`) — no AITER throughput was captured this run, so the ROCm Triton-fallback baseline remains the AMD attention reference. AITER is AMD-only; the cell auto-skips on NVIDIA/Intel.
-- **VRAM differs**: NVIDIA L40 has 45 GB vs 32 GB on AMD/Intel. All four models fit at this workload (~12.3 k KV tokens at C=16); the extra headroom only matters for long-context cells.
+- **VRAM differs**: NVIDIA L40 has 45 GB vs 32 GB on AMD/Intel. All three models fit at this workload (~12.3 k KV tokens at C=16); the extra headroom only matters for long-context cells.
 - **Host CPUs differ**: AMD/Intel runs on an AMD Ryzen 7 9800X3D (consumer), NVIDIA on an Intel Xeon (Sapphire Rapids). Negligible for GPU-bound decode; noted for completeness.

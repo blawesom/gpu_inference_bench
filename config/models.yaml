@@ -5,7 +5,7 @@
 #
 # Conventions:
 #   - `flags:` maps (in common_server, each model, and each config) map to
-#     vLLM CLI args: key `kv-cache-dtype: fp8` becomes `--kv-cache-dtype fp8`.
+#     vLLM CLI args: key `max-num-batched-tokens: 2048` becomes `--max-num-batched-tokens 2048`.
 #     A `true` value becomes a bare `--flag`. Precedence: common < model <
 #     config.
 #   - `env:` maps (same three layers, same precedence, string values only)
@@ -16,8 +16,8 @@
 #     version is probed into environment.json (stack.aiter).
 #   - a config flag can override a model default (e.g. long-context overrides
 #     max-model-len).
-#   - `max_model_len` here is the BASE context length for baseline / kv-fp8;
-#     the long-context config overrides it to 32768.
+#   - `max_model_len` here is the BASE context length for baseline;
+  #     the long-context config overrides it to 32768.
 
 # ── Workload (identical across all models + vendors for comparability) ──────
 workload:
@@ -50,8 +50,9 @@ workload:
   # Output-token accounting guard: expected = num_prompts × random_output_len
   # (ignore_eos pins the length). Below this ratio the level is flagged
   # output-token-shortfall and an API diagnostic is captured — values are
-  # flagged, never "corrected". The 2026-09-03 M2 (gpt-oss) runs counted
-  # ~17% of expected tokens on all three systems.
+  # flagged, never "corrected". (The 2026-09-03 gpt-oss-20b runs counted
+  # ~17% of expected tokens on all three systems, which is why this guard
+  # exists; that model was since dropped from the matrix.)
   token_check_threshold: 0.90
 
 # ── Common server settings (applied to every cell) ──────────────────────────
@@ -64,7 +65,7 @@ common_server:
   # max_num_seqs (default 256) exceeds the Mamba cache block count — M4 on a
   # 32 GB card boots with only 21 blocks ("ValueError: max_num_seqs (256)
   # exceeds available Mamba cache blocks (21)"). M3 gets the same protection
-  # and smaller CUDA-graph captures. Pure-attention M1/M2 are unaffected
+  # and smaller CUDA-graph captures. Pure-attention M1 is unaffected
   # (the workload never exceeds 16 in-flight sequences).
   max_num_seqs: 16
   trust_remote_code: true
@@ -82,9 +83,6 @@ common_server:
 configs:
   baseline:
     flags: {}
-  kv-fp8:
-    flags:
-      kv-cache-dtype: fp8
   long-context:
     flags:
       max-model-len: 32768
@@ -113,17 +111,7 @@ models:
     weights_gb: 19.3
     max_model_len: 8192
     # aiter-attn (T1): AMD-only attention-backend trial, M1 first.
-    configs: [baseline, kv-fp8, long-context, aiter-attn]
-
-  M2:
-    id: openai/gpt-oss-20b
-    class: moe-small
-    format: mxfp4
-    weights_gb: 13.8
-    max_model_len: 8192
-    # No speculative decoding: MTP unsupported for GptOssForCausalLM in
-    # v0.28.0 (verified in spike); ngram not a meaningful axis on random data.
-    configs: [baseline, kv-fp8]
+    configs: [baseline, long-context, aiter-attn]
 
   M3:
     id: cyankiwi/Qwen3.8-27B-AWQ-INT4
@@ -150,7 +138,7 @@ models:
     max_model_len: 2048
     flags:
       max-num-batched-tokens: 2048
-    configs: [baseline, kv-fp8]
+    configs: [baseline]
 
   M4:
     # GPTQ-Int4 (Qwen/Qwen3.5-35B-A3B-GPTQ-Int4) is NOT supported by the
@@ -183,4 +171,4 @@ models:
     # at a decode-perf cost. 35 B on a 32 GB card is the tightest cell in
     # the matrix; if it still does not fit, the honest answer is "M4 needs
     # a 40+ GB card" and it should be dropped from the 32 GB fleet.
-    configs: [baseline, kv-fp8]
+    configs: [baseline]

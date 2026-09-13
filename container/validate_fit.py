@@ -15,7 +15,7 @@ Usage (inside the vLLM container):
   python3 /bench/container/validate_fit.py \\
       --config /bench/config/models.yaml \\
       --results /results \\
-      --vendor amd [--models M1,M2,M3,M4] [--probe] [--start-timeout 600]
+      --vendor amd [--models M1,M3,M4] [--probe] [--start-timeout 600]
 
 Usage (host-side, static-only, no GPU):
   python3 /bench/container/validate_fit.py \\
