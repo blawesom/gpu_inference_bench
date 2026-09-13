@@ -1,0 +1,199 @@
+{
+  "n_samples": 12,
+  "duration_s": 11.0,
+  "mem_peak_gb": 40.6,
+  "mem_avg_gb": 40.6,
+  "util_avg_pct": 100.0,
+  "util_peak_pct": 100.0,
+  "power_avg_w": 275.0,
+  "power_peak_w": 283.3,
+  "energy_j": 3025.6,
+  "temp_avg_c": null,
+  "temp_peak_c": null,
+  "freq_avg_mhz": null,
+  "freq_peak_mhz": null,
+  "window": {
+    "aligned": true,
+    "reason": null,
+    "wall_s": 27.8,
+    "measured_window_s": 12.57,
+    "n_samples": 12,
+    "n_samples_full": 28
+  },
+  "energy_j_per_ktok": null,
+  "full_window": {
+    "power_avg_w": 190.4,
+    "power_peak_w": 283.3,
+    "energy_j": 5059.6
+  },
+  "samples": [
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 234.9,
+      "t": 1788973159.1684103
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 93.85,
+      "t": 1788973160.1682892
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 92.11,
+      "t": 1788973161.1682703
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 91.78,
+      "t": 1788973162.1681714
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 91.54,
+      "t": 1788973163.1687007
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 91.13,
+      "t": 1788973164.1684532
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 90.73,
+      "t": 1788973165.1686602
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 90.61,
+      "t": 1788973166.1686606
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 90.49,
+      "t": 1788973167.1688714
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 89.76,
+      "t": 1788973168.169101
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 89.04,
+      "t": 1788973169.1690876
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 88.92,
+      "t": 1788973170.1696835
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 0.0,
+      "power_w": 88.8,
+      "t": 1788973171.1695437
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 207.05,
+      "t": 1788973172.1798873
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 248.77,
+      "t": 1788973173.1779785
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 252.52,
+      "t": 1788973174.171016
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 280.3,
+      "t": 1788973175.18336
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 273.92,
+      "t": 1788973176.178552
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 277.0,
+      "t": 1788973177.1814356
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 265.9,
+      "t": 1788973178.1819534
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 280.68,
+      "t": 1788973179.1739304
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 263.95,
+      "t": 1788973180.1826928
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 283.27,
+      "t": 1788973181.1818945
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 278.08,
+      "t": 1788973182.1811836
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 273.49,
+      "t": 1788973183.18081
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 273.66,
+      "t": 1788973184.1825564
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 275.46,
+      "t": 1788973185.1841028
+    },
+    {
+      "mem_used_gb": 40.6,
+      "util_pct": 100.0,
+      "power_w": 274.13,
+      "t": 1788973186.182505
+    }
+  ]
+}

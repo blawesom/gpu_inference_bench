@@ -1,0 +1,103 @@
+{
+  "n_samples": 6,
+  "duration_s": 15.14,
+  "mem_peak_gb": 28.28,
+  "mem_avg_gb": 28.28,
+  "util_avg_pct": null,
+  "util_peak_pct": null,
+  "power_avg_w": 196.9,
+  "power_peak_w": 234.6,
+  "energy_j": 3476.0,
+  "temp_avg_c": 72.3,
+  "temp_peak_c": 74.0,
+  "freq_avg_mhz": 2566.8,
+  "freq_peak_mhz": 2800.0,
+  "window": {
+    "aligned": true,
+    "reason": null,
+    "wall_s": 24.52,
+    "measured_window_s": 16.66,
+    "n_samples": 6,
+    "n_samples_full": 9
+  },
+  "energy_j_per_ktok": null,
+  "full_window": {
+    "power_avg_w": 161.4,
+    "power_peak_w": 234.6,
+    "energy_j": 4296.9
+  },
+  "samples": [
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 17.69,
+      "temp_c": 64.0,
+      "freq_mhz": 2150.0,
+      "t": 1788989484.4427075
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 20.83,
+      "temp_c": 61.0,
+      "freq_mhz": 1350.0,
+      "t": 1788989487.4763978
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 232.5,
+      "temp_c": 71.0,
+      "freq_mhz": 2300.0,
+      "t": 1788989490.506642
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 228.78,
+      "temp_c": 70.0,
+      "freq_mhz": 2567.0,
+      "t": 1788989493.5348926
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 227.14,
+      "temp_c": 71.0,
+      "freq_mhz": 2583.0,
+      "t": 1788989496.5633664
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 230.33,
+      "temp_c": 74.0,
+      "freq_mhz": 2467.0,
+      "t": 1788989499.590808
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 234.58,
+      "temp_c": 74.0,
+      "freq_mhz": 2367.0,
+      "t": 1788989502.617067
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 226.99,
+      "temp_c": 73.0,
+      "freq_mhz": 2617.0,
+      "t": 1788989505.6462178
+    },
+    {
+      "mem_used_gb": 28.28,
+      "util_pct": null,
+      "power_w": 33.39,
+      "temp_c": 72.0,
+      "freq_mhz": 2800.0,
+      "t": 1788989508.6768556
+    }
+  ]
+}

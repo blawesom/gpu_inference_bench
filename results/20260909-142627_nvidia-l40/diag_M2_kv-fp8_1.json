@@ -1,0 +1,142 @@
+{
+  "tag": "M2_kv-fp8",
+  "concurrency": 1,
+  "num_requests": 3,
+  "responses": [
+    {
+      "index": 0,
+      "raw": {
+        "id": "chatcmpl-98fbdf9e221dcfd6",
+        "object": "chat.completion",
+        "created": 1788973403,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write concise but complete explanation of how Transformer encodes positional info in absence of explicit position embeddings. Then compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim around four paragraphs. No code, no bullet points.\n\nWe need to explain that standard Transformers use absolute positional embeddings added to token embeddings. In absence of explicit embeddings, the model can still learn relative positions via self-attention patterns, but it's limited. We need to explain how RoPE works: rotating query/key vectors in complex plane, encoding relative positions via sinusoidal functions. Compare to learned absolute positions: they are fixed vectors per position, limited to training length, poor generalization to longer sequences. RoPE generalizes better because it encodes relative positions via rotation that can extrapolate to longer lengths.\n\nWe need to mention that RoPE uses sin/cos functions to rotate embeddings, effectively encoding relative position as a phase shift. Provide math: Q_i = x_i W_Q, K_j = x_j W_K, then apply rotation: Q_i' = R(\u03b8_i) Q_i, K_j' = R(\u03b8_j) K_j, where \u03b8"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-65a23b76",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 1,
+      "raw": {
+        "id": "chatcmpl-afef41461f248592",
+        "object": "chat.completion",
+        "created": 1788973405,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write concise but complete explanation of how Transformer encodes positional info in absence of explicit position embeddings. Then compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim around four paragraphs. No code, no bullet points.\n\nWe need to explain that standard Transformers use absolute positional embeddings added to token embeddings. In absence of explicit embeddings, the model can still learn relative positions via self-attention patterns, but it's limited. We need to explain how RoPE works: rotating query/key vectors in complex plane, encoding relative positions via sinusoidal functions. Compare to learned absolute positions: they are fixed vectors per position, limited to training length, poor generalization to longer sequences. RoPE generalizes better because it encodes relative positions via rotation that can extrapolate to longer lengths.\n\nWe need to mention that RoPE uses sin/cos functions to rotate embeddings, effectively encoding relative position as a phase shift. Provide math: Q_i = x_i W_Q, K_j = x_j W_K, then apply rotation: Q_i' = R(\u03b8_i) Q_i, K_j' = R(\u03b8_j) K_j, where \u03b8"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-65a23b76",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 2,
+      "raw": {
+        "id": "chatcmpl-a05f34b7ac5319b3",
+        "object": "chat.completion",
+        "created": 1788973407,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write concise but complete explanation of how Transformer encodes positional info in absence of explicit position embeddings. Then compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim around four paragraphs. No code, no bullet points.\n\nWe need to explain that standard Transformers use absolute positional embeddings added to token embeddings. In absence of explicit embeddings, the model can still learn relative positions via self-attention patterns, but it's limited. We need to explain how RoPE works: rotating query/key vectors in complex plane, encoding relative positions via sinusoidal functions. Compare to learned absolute positions: they are fixed vectors per position, limited to training length, poor generalization to longer sequences. RoPE generalizes better because it encodes relative positions via rotation that can extrapolate to longer lengths.\n\nWe need to mention that RoPE uses sin/cos functions to rotate embeddings, effectively encoding relative position as a phase shift. Provide math: Q_i = x_i W_Q, K_j = x_j W_K, then apply rotation: Q_i' = R(\u03b8_i) Q_i, K_j' = R(\u03b8_j) K_j, where \u03b8"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-65a23b76",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    }
+  ]
+}

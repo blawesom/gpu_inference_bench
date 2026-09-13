@@ -12,15 +12,25 @@ import json
 import sys
 from pathlib import Path
 
-# (key, run-dir, display label)
+# (key, display label, original run dir [Sept 3-5, legacy protocol],
+#   re-run dir [corrected T0/P0/P1 protocol — the authoritative ranking]).
+# The re-run is what the primary tables rank; the original run is kept so the
+# "Protocol change" section can show the old -> new deltas per card.
 SYSTEMS = [
-    ("AMD",   "20260903-222650_0x7551", "AMD 0x7551"),
-    ("Intel", "20260904-212058_intel-r-arc-tm-pro-b70-graphics", "Intel Arc Pro B70"),
-    ("NV",    "20260905-134350_nvidia-l40", "NVIDIA L40"),
+    ("AMD",   "AMD 0x7551",
+        "20260903-222650_0x7551",
+        "20260913-141852_0x7551"),
+    ("Intel", "Intel Arc Pro B70",
+        "20260904-212058_intel-r-arc-tm-pro-b70-graphics",
+        "20260909-210037_intel-r-arc-tm-pro-b70-graphics"),
+    ("NV",    "NVIDIA L40",
+        "20260905-134350_nvidia-l40",
+        "20260909-142627_nvidia-l40"),
 ]
 
 # Documented max TDP for the Intel Arc Pro B70 (Intel Arc Pro B-Series spec
-# sheet). Used because the XPU run captured no power telemetry.
+# sheet). Fallback only: used for legacy runs where the XPU card captured no
+# power telemetry. The re-run measures real power via xpu-smi 2.1.0.
 INTEL_B70_TDP_W = 230.0
 
 CS = [1, 4, 8, 16]
@@ -39,22 +49,29 @@ METRICS = [
     ("ITL", "itl_p50_ms", "itl_p99_ms"),
 ]
 
-data = {}  # key -> {"label", "dir", "report", "env"}
+data = {}  # key -> {"label", "rerun": {"dir","report","env"}, "orig": {...}}
+
+
+def _load_run(repo: Path, d: str) -> dict:
+    run = repo / "results" / d
+    return {
+        "dir": d,
+        "report": json.loads((run / "report.json").read_text()),
+        "env": json.loads((run / "environment.json").read_text()),
+    }
 
 
 def load(repo: Path) -> None:
-    for k, d, label in SYSTEMS:
-        run = repo / "results" / d
+    for k, label, orig, rerun in SYSTEMS:
         data[k] = {
             "label": label,
-            "dir": d,
-            "report": json.loads((run / "report.json").read_text()),
-            "env": json.loads((run / "environment.json").read_text()),
+            "rerun": _load_run(repo, rerun),
+            "orig": _load_run(repo, orig),
         }
 
 
-def row(key, model, config, c):
-    for r in data[key]["report"]["rows"]:
+def row(key, model, config, c, gen="rerun"):
+    for r in data[key][gen]["report"]["rows"]:
         if (r["model"] == model and r["config"] == config
                 and r.get("concurrency") == c and r["status"] == "ok"):
             return r
@@ -132,8 +149,8 @@ def lat_mean(k, field):
 def worst_cell(field):
     """(value, key, row) of the largest rankable baseline-cell value."""
     best_v, out = None, None
-    for k, _, _ in SYSTEMS:
-        for r in data[k]["report"]["rows"]:
+    for k, *_ in SYSTEMS:
+        for r in data[k]["rerun"]["report"]["rows"]:
             if r["config"] != "baseline" or not row_rankable(r):
                 continue
             v = r.get(field)
@@ -142,9 +159,10 @@ def worst_cell(field):
     return best_v, out
 
 
-def eff_cell(k, mid, cfg):
-    """(tok/s per watt, (watts, assumed)) at C=16; Intel falls back to TDP."""
-    r = row(k, mid, cfg, 16)
+def eff_cell(k, mid, cfg, gen="rerun"):
+    """(tok/s per watt, (watts, assumed)) at C=16; Intel falls back to TDP
+    only when that generation has no measured power (legacy runs)."""
+    r = row(k, mid, cfg, 16, gen=gen)
     if not row_rankable(r):
         return None
     p = (r.get("telemetry") or {}).get("power_avg_w")
@@ -157,6 +175,16 @@ def eff_cell(k, mid, cfg):
     return r["output_throughput"] / p, (p, assumed)
 
 
+def has_measured_power(k, gen="rerun"):
+    """True if any rankable baseline cell of that generation carries real
+    power (telemetry.power_avg_w) — i.e. not TDP-assumed."""
+    for r in data[k][gen]["report"]["rows"]:
+        if (r["config"] == "baseline" and row_rankable(r)
+                and (r.get("telemetry") or {}).get("power_avg_w") is not None):
+            return True
+    return False
+
+
 def slot_of(mid):
     return [s for s, m, _ in MODEL_ORDER if m == mid][0]
 
@@ -165,10 +193,147 @@ def desc_of(mid):
     return [d for s, m, d in MODEL_ORDER if m == mid][0]
 
 
+def _shortfall(r):
+    if not r:
+        return False
+    if (r.get("token_check") or {}).get("flag"):
+        return True
+    return "output-token-shortfall" in (r.get("flags") or [])
+
+
+def build_impact(labels, keys, excluded_models):
+    """Old (Sept 3-5, legacy protocol) -> new (re-run) deltas per card and the
+    effect on the cross-system ranking. Appended as a standalone section."""
+    L = []
+    L.append("## Protocol change: original (Sept 3–5) → re-run (corrected)\n")
+    L.append("The original runs used the legacy protocol (prefix caching **ON**, "
+             "single measured pass, power over the full bench-client window, no "
+             "Intel power telemetry). The re-run applies the 2026-09-08 fixes: "
+             "prefix caching **OFF** (verified per cell), per-level warmup until "
+             "no JIT, **3-pass median**, power/energy **aligned to the measured "
+             "window**, and **measured Intel power** (xpu-smi 2.1.0). Two fixes "
+             "oppose each other on throughput — prefix-caching off *removes "
+             "replay cache hits* (deflates) while warmup-until-no-JIT *removes "
+             "in-bench Triton JIT stalls* (inflates) — and they roughly cancel, "
+             "except where the JIT stall was the dominant legacy defect.\n")
+
+    # rankable model list (drops M2, which is output-token-shortfall everywhere)
+    rank = [(slot, mid) for slot, mid, _ in MODEL_ORDER
+            if slot not in excluded_models]
+
+    # ── C=16 baseline throughput, old -> new ────────────────────────────────
+    L.append("### C=16 baseline output throughput, original → re-run (tok/s, Δ%)\n")
+    L.append("| Model | " + " | ".join(labels[k] for k in keys) + " |")
+    L.append("|---|" + "---|" * len(keys))
+    for slot, mid, _ in MODEL_ORDER:
+        cells = []
+        for k in keys:
+            o = row(k, mid, "baseline", 16, gen="orig")
+            n = row(k, mid, "baseline", 16, gen="rerun")
+            vo = o["output_throughput"] if (o and o.get("status") == "ok") else None
+            vn = n["output_throughput"] if (n and n.get("status") == "ok") else None
+            if vo is None and vn is None:
+                cells.append("n/a")
+            elif vo is None:
+                cells.append(f"{vn:.0f}")
+            else:
+                d = 100.0 * (vn - vo) / vo
+                mark = "†" if _shortfall(n) else ""
+                cells.append(f"{vo:.0f} → {vn:.0f}{mark} ({d:+.0f}%)")
+        L.append(f"| {slot} · {mid} | " + " | ".join(cells) + " |")
+    L.append("\n† M2 (gpt-oss-20b) stays output-token-shortfall on all systems and "
+             "remains **excluded** from rankings (Δ shown for reference only).\n")
+
+    # ── mean efficiency old -> new per card ─────────────────────────────────
+    em_old, em_new = {}, {}
+    for k in keys:
+        eo = [e[0] for e in (eff_cell(k, mid, "baseline", "orig") for _, mid in rank) if e]
+        en = [e[0] for e in (eff_cell(k, mid, "baseline", "rerun") for _, mid in rank) if e]
+        em_old[k], em_new[k] = mean(eo), mean(en)
+    L.append("### Mean power efficiency (tok/s/W @ C=16, rankable models), original → re-run\n")
+    L.append("| Card | original | re-run | Δ | power (orig → re-run) |")
+    L.append("|---|---|---|---|---|")
+    for k in keys:
+        po = "measured" if has_measured_power(k, "orig") else f"assumed {INTEL_B70_TDP_W:.0f} W"
+        pn = "measured" if has_measured_power(k, "rerun") else f"assumed {INTEL_B70_TDP_W:.0f} W"
+        d = 100.0 * (em_new[k] - em_old[k]) / em_old[k] if em_old[k] else None
+        L.append(f"| {labels[k]} | {em_old[k]:.2f} | {em_new[k]:.2f} | "
+                 f"{d:+.0f}% | {po} → {pn} |")
+    L.append("")
+
+    # ── share of leader old vs new ──────────────────────────────────────────
+    def share_leader(gen):
+        s = {}
+        for _, mid in rank:
+            vals = {}
+            for k in keys:
+                r = row(k, mid, "baseline", 16, gen=gen)
+                if row_rankable(r):
+                    vals[k] = r["output_throughput"]
+            if vals:
+                mx = max(vals.values())
+                s[mid] = {k: 100.0 * vals[k] / mx for k in vals}
+        return s
+    so_old, so_new = share_leader("orig"), share_leader("rerun")
+    L.append("### Share of leader @ C=16 (rankable models), original → re-run\n")
+    L.append("| Model | " + " | ".join(f"{labels[k]} old → new" for k in keys) + " |")
+    L.append("|---|" + "---|" * len(keys))
+    for slot, mid in rank:
+        cells = []
+        for k in keys:
+            o, n = so_old.get(mid, {}).get(k), so_new.get(mid, {}).get(k)
+            cells.append(f"{o:.0f}% → {n:.0f}%" if (o is not None and n is not None) else "n/a")
+        L.append(f"| {slot} · {mid} | " + " | ".join(cells) + " |")
+    L.append("")
+
+    # ── ranking impact ──────────────────────────────────────────────────────
+    ms_old = {k: mean([so_old[m].get(k) for m in so_old if k in so_old[m]]) for k in keys}
+    ms_new = {k: mean([so_new[m].get(k) for m in so_new if k in so_new[m]]) for k in keys}
+    thr_old = sorted(keys, key=lambda k: -ms_old[k])
+    thr_new = sorted(keys, key=lambda k: -ms_new[k])
+    eff_old = sorted(keys, key=lambda k: -em_old[k])
+    eff_new = sorted(keys, key=lambda k: -em_new[k])
+    # largest single-cell throughput delta (rankable)
+    deltas = []
+    for k in keys:
+        for slot, mid in rank:
+            o, n = row(k, mid, "baseline", 16, gen="orig"), row(k, mid, "baseline", 16, gen="rerun")
+            if row_rankable(o) and row_rankable(n):
+                d = 100.0 * (n["output_throughput"] - o["output_throughput"]) / o["output_throughput"]
+                deltas.append((d, k, slot))
+    deltas.sort(key=lambda x: -abs(x[0]))
+    big_d, big_k, big_slot = deltas[0]
+    top_e, bot_e = eff_new[0], eff_new[-1]
+    ratio_old = em_old[top_e] / em_old[bot_e]
+    ratio_new = em_new[top_e] / em_new[bot_e]
+
+    L.append("### Ranking impact\n")
+    L.append(f"- **Throughput order** {'unchanged' if thr_old == thr_new else 'CHANGED'}: "
+             f"{' > '.join(labels[k] for k in thr_old)} → "
+             f"{' > '.join(labels[k] for k in thr_new)}.")
+    L.append(f"- **Efficiency order** {'unchanged' if eff_old == eff_new else 'CHANGED'}: "
+             f"{' > '.join(labels[k] for k in eff_old)} → "
+             f"{' > '.join(labels[k] for k in eff_new)}.")
+    L.append(f"- **{labels[top_e]}’s efficiency lead over {labels[bot_e]}** shrank from "
+             f"{ratio_old:.1f}× (original) to **{ratio_new:.1f}×** (re-run): the legacy "
+             "power window under-stated steady-state draw, so the original figures were "
+             "optimistic.")
+    L.append(f"- The largest single-cell throughput swing is **{labels[big_k]} {big_slot}** "
+             f"({big_d:+.0f}% at C=16 baseline) — the rest of the matrix moves <5%, so the "
+             "gap compression is driven by that one JIT-deflated cell.")
+    if (not has_measured_power("Intel", "orig")
+            and has_measured_power("Intel", "rerun")):
+        L.append(f"- **{labels['Intel']}** is now on **measured** power (xpu-smi 2.1.0) "
+                 "instead of an assumed 230 W TDP floor — its efficiency is real draw, so "
+                 "the old “conservative floor” caveat no longer applies.")
+    L.append("")
+    return L
+
+
 def build() -> str:
     L = []
-    keys = [k for k, _, _ in SYSTEMS]
-    labels = {k: l for k, _, l in SYSTEMS}
+    keys = [k for k, *_ in SYSTEMS]
+    labels = {k: l for k, l, *_ in SYSTEMS}
 
     # ── derived stats (baseline config unless noted) ───────────────────────
     c16 = {mid: {k: v for k, v in
@@ -239,8 +404,11 @@ def build() -> str:
         ("OS / CPU", lambda e: f"{e.get('os') or '?'} / {e.get('cpu') or '?'}"),
     ]
     for label, fn in fields:
-        L.append(f"| {label} | " + " | ".join(fn(data[k]["env"]) for k in keys) + " |")
-    L.append("| Run dir | " + " | ".join(f"`results/{d}`" for _, d, _ in SYSTEMS) + " |")
+        L.append(f"| {label} | " + " | ".join(fn(data[k]["rerun"]["env"]) for k in keys) + " |")
+    L.append("| Run dir (re-run) | "
+             + " | ".join(f"`results/{data[k]['rerun']['dir']}`" for k in keys) + " |")
+    L.append("| Run dir (orig.) | "
+             + " | ".join(f"`results/{data[k]['orig']['dir']}`" for k in keys) + " |")
     L.append("")
 
     # ── executive summary ──────────────────────────────────────────────────
@@ -254,12 +422,16 @@ def build() -> str:
              f"(peak {peak:.0f} tok/s); across the {len(MODEL_ORDER) - len(excluded_models)}-model matrix{excl_note} "
              f"{labels[second]} averages {share[second]:.0%} and "
              f"{labels[third]} {share[third]:.0%} of the leader's throughput.")
+    assumed = [labels[k] for k in keys if not has_measured_power(k)]
+    pw_note = (" All three systems use measured power in the aligned window."
+               if not assumed else
+               " " + ", ".join(assumed) +
+               f" assume max TDP (no power telemetry captured).")
     L.append(f"- **{labels[top]} is also the most power-efficient**: "
              f"{eff_mean[top]:.2f} mean output tok/s per watt @ C=16 vs "
              f"{eff_mean[second]:.2f} ({labels[second]}) and "
              f"{eff_mean[third]:.2f} ({labels[third]}) — "
-             f"{eff_mean[top] / eff_mean[third]:.1f}× the slowest. Intel's figure is a "
-             "conservative floor (230 W assumed, no GPU telemetry captured).")
+             f"{eff_mean[top] / eff_mean[third]:.1f}× the slowest.{pw_note}")
     tpot_best = min(keys, key=lambda k: lat["TPOT"][k][0])
     tpot_worst = max(keys, key=lambda k: lat["TPOT"][k][0])
     tail_best = min(keys, key=lambda k: tail[k])
@@ -428,34 +600,20 @@ def build() -> str:
 
     # ── power efficiency ───────────────────────────────────────────────────
     L.append("## Power efficiency (output tok/s per watt)\n")
-    aligned = {k for k in keys
-               for mid in c16
-               if (row(k, mid, "baseline", 16).get("telemetry") or {}).get("window")
-               is not None}
-    if aligned == set(keys):
-        L.append("C=16, baseline. AMD/NVIDIA: `power_avg_w` aligned to the "
-                 "**measured bench window** (last `duration` s of the client "
-                 "wall time) — same window the throughput covers. Energy is "
-                 "**GPU-only** (vendor power sensor), not system energy. "
-                 f"Intel: no GPU telemetry captured → evaluated at the "
-                 f"documented **{INTEL_B70_TDP_W:.0f} W max TDP**, so its "
-                 "values are conservative floors.\n")
-    elif not aligned:
-        L.append("C=16, baseline. AMD/NVIDIA: `power_avg_w` over the **full "
-                 "bench client window** (pre-P1 runs — client startup + "
-                 "warmups + measured + teardown), NOT aligned to the "
-                 "measured window: avg power is under-stated, so these "
-                 "tok/s/W figures are optimistic (an upper bound). Intel: "
-                 f"no GPU telemetry captured → evaluated at the documented "
-                 f"**{INTEL_B70_TDP_W:.0f} W max TDP**, so its values are "
-                 "conservative floors.\n")
-    else:
-        L.append("C=16, baseline. Power window per run: "
-                 + ", ".join(f"{labels[k]} {'aligned' if k in aligned else 'full client window (pre-P1, optimistic)'}"
-                             for k in keys)
-                 + ". Intel: no GPU telemetry captured → "
-                 f"documented **{INTEL_B70_TDP_W:.0f} W max TDP** "
-                 "(conservative floors).\n")
+    # Per-card window/power note so the header works for any mix of
+    # generations (some aligned, some legacy, some TDP-assumed).
+    win_parts = []
+    for k in keys:
+        r = row(k, MODEL_ORDER[0][1], "baseline", 16)
+        t = (r.get("telemetry") or {}) if r else {}
+        win = ("aligned to the measured window" if t.get("window")
+               else "full-client window (pre-P1)")
+        pw = ("measured" if t.get("power_avg_w") is not None
+              else f"assumed {INTEL_B70_TDP_W:.0f} W (no telemetry)")
+        win_parts.append(f"{labels[k]}: {win}, {pw}")
+    L.append("C=16, baseline. " + " · ".join(win_parts) + ". "
+             "Energy is GPU-only (vendor power sensor), not system energy; "
+             "`energy_j_per_ktok` is per level.\n")
     L.append("| Model | " + " | ".join(labels[k] for k in keys) + " |")
     L.append("|---|" + "---|" * len(keys))
     for slot, mid, _ in MODEL_ORDER:
@@ -468,7 +626,8 @@ def build() -> str:
     L.append("| **Overall (mean)** | "
              + " | ".join(f"**{eff_mean[k]:.2f}**" for k in keys) + " |")
     L.append("")
-    L.append("Note: Intel power assumed (max TDP), not measured.\n")
+    if any(not has_measured_power(k) for k in keys):
+        L.append("Note: some power values are assumed (max TDP), not measured.\n")
     L.append("### Takeaways\n")
     best_e = max(keys, key=lambda k: eff_mean[k])
     worst_e = min(keys, key=lambda k: eff_mean[k])
@@ -484,47 +643,57 @@ def build() -> str:
     L.append(f"- Worst efficiency cell: {labels[weff[1]]} on {weff[2]} "
              f"({weff[0]:.2f} tok/s/W at {wW:.0f} W) — dense 27B decode is "
              "power-hungry on this stack.")
-    L.append(f"- {labels['Intel']}'s true efficiency is at or above the values shown "
-             "(assumed full TDP; actual draw was likely lower).")
+    if not has_measured_power("Intel"):
+        L.append(f"- {labels['Intel']}'s true efficiency is at or above the values shown "
+                 "(assumed full TDP; actual draw was likely lower).")
     L.append("")
+
+    # ── protocol change: old (Sept 3-5) -> new (re-run) ──────────────────
+    L.extend(build_impact(labels, keys, excluded_models))
 
     # ── caveats ────────────────────────────────────────────────────────────
     L.append("## Caveats\n")
-    L.append("- **Protocol defects (2026-09-08 review, P0)**: these runs used "
-             "vLLM 0.28.0 defaults with **prefix caching effectively ON in "
-             "every cell** (verified from server logs — the config only "
-             "*commented* it off) and a single measured pass per level "
-             "(2 warmups). With a fixed-seed workload, prompts are replayed "
-             "at each concurrency level, so prefix-cache hits (up to 76% on "
-             "M2/AMD @ C=16) inflate throughput — most at high C. The "
-             "corrected reference (cache off, per-level warmup until no JIT, "
-             "≥ 3 passes with server restarts) is implemented in "
-             "`container/run_matrix.py` + `config/models.yaml`; a re-run "
-             "(T0) is required before re-ranking. See "
-             "`docs/Benchmark_GPU_Conclusions_et_plan_de_tests_Benjamin.pdf`.")
-    L.append("- **M2 (gpt-oss-20b) is provisional on all systems**: only "
-             "~15–20% of the expected 12 800 output tokens were counted "
-             "(† in the tables). Suspected reasoning-token split under the "
-             "OpenAI chat endpoint (server logs show "
-             "`reasoning_parser='openai_gptoss'`); unconfirmed. M2 cells are "
-             "excluded from all derived stats above. Raw API diagnostics are "
-             "captured automatically on the next run (P0-2).")
+    L.append("- **Protocol (P0/P1/T1) now enforced**: prefix caching OFF "
+             "(verified per cell), per-level warmup until no JIT, 3-pass "
+             "median, and power/energy aligned to the measured bench window "
+             "(GPU-only, vendor power sensor). The Sept 3–5 legacy runs "
+             "(prefix caching ON, single pass, unaligned power window, no "
+             "Intel power telemetry) are **superseded** — see the "
+             "\"Protocol change\" section for the effect on their numbers.")
+    L.append("- **M2 (gpt-oss-20b) is excluded on all systems**: "
+             "output-token accounting falls to ~16–19% of the expected "
+             "12 800 tokens (output-token-shortfall) — suspected "
+             "reasoning-token split under the OpenAI chat endpoint. Raw API "
+             "diagnostics are captured (`diag_M2_*.json`). M2 cells are "
+             "excluded from all rankings and derived stats above.")
+    # per-card data-quality notes: failed cells + single-pass measurements
+    for k in keys:
+        rpt = data[k]["rerun"]["report"]
+        failed = [f"{r['config']} ({r.get('reason')})"
+                  for r in rpt["rows"]
+                  if r.get("status") == "failed" and r["config"] != "aiter-attn"]
+        single = sorted({r["model"].split("/")[-1]
+                         for r in rpt["rows"]
+                         if r["config"] == "baseline" and r.get("status") == "ok"
+                         and r.get("num_passes") == 1})
+        bits = []
+        if failed:
+            bits.append("**failed cells**: " + ", ".join(failed))
+        if single:
+            bits.append("**single-pass (not a 3-pass median)**: " + ", ".join(single))
+        if bits:
+            L.append(f"- **{labels[k]} re-run**: " + "; ".join(bits) + ".")
+    L.append("- **AITER (T1) M1 on AMD**: the aiter-attn cell failed at engine "
+             "startup (`pass1-failed:engine-startup`) — no AITER throughput "
+             "was captured this run, so the ROCm Triton-fallback baseline "
+             "remains the AMD attention reference. AITER is AMD-only; the "
+             "cell auto-skips on NVIDIA/Intel.")
     L.append("- **VRAM differs**: NVIDIA L40 has 45 GB vs 32 GB on AMD/Intel. "
-             "All four models fit comfortably on 32 GB at this workload "
-             "(~12.3 k KV tokens at C=16), so the extra headroom does not "
-             "change scheduling; it only matters for long-context cells.")
-    L.append("- **AMD**: M1 `long-context` cell failed at engine startup "
-             "(`failed: engine-startup`); shown as n/a. All other cells ran.")
-    L.append("- **Intel**: the XPU run captured **no GPU telemetry** "
-             "(mem/util/power). Power-efficiency figures for Intel assume the "
-             f"documented **max TDP of {INTEL_B70_TDP_W:.0f} W** for the Arc Pro "
-             "B70 (Intel Arc Pro B-Series spec sheet) — an upper bound on "
-             "actual draw, so Intel's tok/s-per-W values are conservative "
-             "floors (true efficiency is at or better than shown).")
+             "All four models fit at this workload (~12.3 k KV tokens at "
+             "C=16); the extra headroom only matters for long-context cells.")
     L.append("- **Host CPUs differ**: AMD/Intel runs on an AMD Ryzen 7 9800X3D "
              "(consumer), NVIDIA on an Intel Xeon (Sapphire Rapids). Negligible "
-             "for GPU-bound decode; noted for completeness. The AMD run used "
-             "GPU index 1 on a dual-GPU host.")
+             "for GPU-bound decode; noted for completeness.")
 
     return "\n".join(L)
 

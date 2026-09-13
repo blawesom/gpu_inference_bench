@@ -1,0 +1,343 @@
+{
+  "n_samples": 34,
+  "duration_s": 99.94,
+  "mem_peak_gb": 26.63,
+  "mem_avg_gb": 26.63,
+  "util_avg_pct": null,
+  "util_peak_pct": null,
+  "power_avg_w": 226.8,
+  "power_peak_w": 238.0,
+  "energy_j": 22673.3,
+  "temp_avg_c": 75.5,
+  "temp_peak_c": 78.0,
+  "freq_avg_mhz": 2765.2,
+  "freq_peak_mhz": 2800.0,
+  "window": {
+    "aligned": true,
+    "reason": null,
+    "wall_s": 117.46,
+    "measured_window_s": 103.91,
+    "n_samples": 34,
+    "n_samples_full": 39
+  },
+  "energy_j_per_ktok": 1771.4,
+  "full_window": {
+    "power_avg_w": 221.2,
+    "power_peak_w": 238.0,
+    "energy_j": 25449.1
+  },
+  "samples": [
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.99,
+      "temp_c": 73.0,
+      "freq_mhz": 2100.0,
+      "t": 1788983673.9233932
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 22.51,
+      "temp_c": 64.0,
+      "freq_mhz": 1350.0,
+      "t": 1788983676.9570749
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 219.19,
+      "temp_c": 71.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983679.9862394
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 220.06,
+      "temp_c": 72.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983683.014894
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.3,
+      "temp_c": 73.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983686.0437458
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 225.52,
+      "temp_c": 74.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983689.0731018
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 225.58,
+      "temp_c": 74.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983692.1016023
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 225.44,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983695.1311607
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.05,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983698.1604345
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.74,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983701.187874
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.08,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983704.216783
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.88,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983707.2451813
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 228.46,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983710.274404
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.48,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983713.3023934
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.21,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983716.3312418
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.0,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983719.3577893
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.94,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983722.3863475
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 229.02,
+      "temp_c": 75.0,
+      "freq_mhz": 2400.0,
+      "t": 1788983725.4142244
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.13,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983728.4439008
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.78,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983731.4727771
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 224.24,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983734.5011835
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.19,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983737.5287802
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.08,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983740.556568
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 226.87,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983743.5813982
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.16,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983746.6095662
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 238.03,
+      "temp_c": 77.0,
+      "freq_mhz": 2333.0,
+      "t": 1788983749.6380882
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.29,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983752.6671422
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.08,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983755.6963942
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 214.44,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983758.7257998
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.39,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983761.7540555
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.04,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983764.7826471
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.62,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983767.8116553
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.16,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983770.8395963
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 234.9,
+      "temp_c": 78.0,
+      "freq_mhz": 2483.0,
+      "t": 1788983773.8693638
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.28,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983776.8968909
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 227.02,
+      "temp_c": 76.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983779.9259236
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 223.59,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983782.9545329
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 224.05,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983785.9826026
+    },
+    {
+      "mem_used_gb": 26.63,
+      "util_pct": null,
+      "power_w": 223.36,
+      "temp_c": 75.0,
+      "freq_mhz": 2800.0,
+      "t": 1788983789.0125082
+    }
+  ]
+}

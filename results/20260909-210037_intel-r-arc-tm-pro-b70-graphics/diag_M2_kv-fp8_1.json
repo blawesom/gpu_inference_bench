@@ -1,0 +1,142 @@
+{
+  "tag": "M2_kv-fp8",
+  "concurrency": 1,
+  "num_requests": 3,
+  "responses": [
+    {
+      "index": 0,
+      "raw": {
+        "id": "chatcmpl-8aef2c0180cf99e2",
+        "object": "chat.completion",
+        "created": 1788989173,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write concise but complete explanation of how Transformer encodes positional info in absence of explicit position embeddings. Then compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim for around four paragraphs. No code, no bullet points.\n\nWe need to explain that standard Transformers use absolute positional embeddings added to token embeddings. In absence of explicit embeddings, the model can still learn relative positions via self-attention patterns, but it's limited. We need to explain how positional info can be encoded implicitly via attention weights or via relative position biases. Then explain RoPE: uses sinusoidal rotations in query/key space, encoding relative positions via rotation matrices. Compare to learned absolute positions: absolute embeddings are fixed per position, limited to training length; RoPE generalizes to longer sequences because rotation depends on relative distance, not absolute index. Provide math: Q_i, K_j, RoPE: Q_i' = Q_i * R(i), K_j' = K_j * R(j), where R(t) is rotation matrix with angle proportional to t. Then attention uses dot product of rotated queries and keys. For absolute: E_pos(i) added to token embedding"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-c6df9425",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 1,
+      "raw": {
+        "id": "chatcmpl-8d1bff6f75d964a0",
+        "object": "chat.completion",
+        "created": 1788989176,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write concise but complete explanation of how Transformer encodes positional info in absence of explicit position embeddings. Then compare RoPE with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible. Aim for around four paragraphs. No code, no bullet points. So we need to explain that standard Transformers use absolute positional embeddings added to token embeddings. In absence of explicit embeddings, they can still encode relative positions via self-attention patterns or via relative position bias. But the question: \"in the absence of explicit position embeddings\" maybe refers to models that don't use position embeddings at all, like some variants that rely on relative position biases or on the attention pattern itself. But the question: \"Write a concise but complete explanation of how a Transformer model encodes positional information in the absence of explicit position embeddings\" So we need to explain that the model can still encode positions via the attention mechanism: the attention weights depend on query-key dot products, which can be modulated by relative position biases or by adding a learned bias per relative distance. Also, the model can use the fact that the attention matrix is computed per token pair, so the pattern of attention can encode relative positions. But if no explicit embeddings, the model might"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-c6df9425",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 2,
+      "raw": {
+        "id": "chatcmpl-99cc2dae03b8b980",
+        "object": "chat.completion",
+        "created": 1788989178,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write a concise but complete explanation of how a Transformer model encodes positional information in the absence of explicit position embeddings. Then compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim for around four paragraphs. No code, no bullet points.\n\nWe need to explain that Transformers are permutation invariant, so they need positional encoding. In absence of explicit position embeddings, they can use relative attention or other mechanisms. But the question: \"in the absence of explicit position embeddings\" - maybe they refer to the fact that the model can still encode positions via the attention pattern? Actually, Transformers rely on positional embeddings to break symmetry. Without them, the model would treat tokens as identical regardless of order. But some variants use relative position biases or learned absolute positions. The question: \"Write a concise but complete explanation of how a Transformer model encodes positional information in the absence of explicit position embeddings\" - maybe they refer to the fact that the model can still encode positions via the attention weights themselves, e.g., using relative position biases or using the query-key dot product to encode relative distances. But the phrase \"in the absence of explicit position embeddings\""
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-c6df9425",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    }
+  ]
+}

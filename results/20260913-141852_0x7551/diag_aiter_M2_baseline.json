@@ -1,0 +1,148 @@
+{
+  "tag": "M2_baseline",
+  "model": "openai/gpt-oss-20b",
+  "num_requests": 3,
+  "max_tokens": 64,
+  "temperature": 0,
+  "purpose": "T1 numerical-validity: token-diff baseline vs aiter-attn",
+  "responses": [
+    {
+      "index": 0,
+      "prompt": "What is the capital of France? Answer in one short sentence.",
+      "raw": {
+        "id": "chatcmpl-8feb9adc87245e20",
+        "object": "chat.completion",
+        "created": 1789309355,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "Paris is the capital of France.",
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "The user asks: \"What is the capital of France? Answer in one short sentence.\" So answer: \"Paris is the capital of France.\" That's one short sentence."
+            },
+            "logprobs": null,
+            "finish_reason": "stop",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-d7a3d639",
+        "usage": {
+          "prompt_tokens": 80,
+          "total_tokens": 131,
+          "completion_tokens": 51,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 1,
+      "prompt": "List the first five prime numbers, separated by commas. No other text.",
+      "raw": {
+        "id": "chatcmpl-b48ad9d49230ee79",
+        "object": "chat.completion",
+        "created": 1789309359,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "2, 3, 5, 7, ",
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "The user wants: \"List the first five prime numbers, separated by commas. No other text.\" So just output: 2, 3, 5, 7, 11. No other text."
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-d7a3d639",
+        "usage": {
+          "prompt_tokens": 82,
+          "total_tokens": 146,
+          "completion_tokens": 64,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 2,
+      "prompt": "Explain, in two sentences, why the sky is blue. No headings.",
+      "raw": {
+        "id": "chatcmpl-8547635c37dace4c",
+        "object": "chat.completion",
+        "created": 1789309363,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "The user wants a two-sentence explanation of why the sky is blue, no headings. So just two sentences. Should be concise. Provide explanation: Rayleigh scattering, shorter wavelengths scatter more. Also mention that sunlight is white but blue is scattered. So two sentences. Ensure no headings. Let's produce."
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-d7a3d639",
+        "usage": {
+          "prompt_tokens": 82,
+          "total_tokens": 146,
+          "completion_tokens": 64,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    }
+  ]
+}

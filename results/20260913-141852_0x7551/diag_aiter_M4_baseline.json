@@ -1,0 +1,142 @@
+{
+  "tag": "M4_baseline",
+  "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+  "num_requests": 3,
+  "max_tokens": 64,
+  "temperature": 0,
+  "purpose": "T1 numerical-validity: token-diff baseline vs aiter-attn",
+  "responses": [
+    {
+      "index": 0,
+      "prompt": "What is the capital of France? Answer in one short sentence.",
+      "raw": {
+        "id": "chatcmpl-82fa14097ed69f03",
+        "object": "chat.completion",
+        "created": 1789322180,
+        "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Question: \"What is the capital of France?\"\n    *   Constraint: \"Answer in one short sentence.\"\n\n2.  **Identify the Fact:**\n    *   The capital of France is Paris.\n\n3.",
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": null
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-766d4701",
+        "usage": {
+          "prompt_tokens": 23,
+          "total_tokens": 87,
+          "completion_tokens": 64,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": null
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 1,
+      "prompt": "List the first five prime numbers, separated by commas. No other text.",
+      "raw": {
+        "id": "chatcmpl-95c2ea304f5b7ed0",
+        "object": "chat.completion",
+        "created": 1789322186,
+        "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: List the first five prime numbers.\n    *   Format: Separated by commas.\n    *   Constraint: No other text.\n\n2.  **Identify Prime Numbers:**\n    *   A prime number",
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": null
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-766d4701",
+        "usage": {
+          "prompt_tokens": 25,
+          "total_tokens": 89,
+          "completion_tokens": 64,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": null
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 2,
+      "prompt": "Explain, in two sentences, why the sky is blue. No headings.",
+      "raw": {
+        "id": "chatcmpl-92a39674e1366f49",
+        "object": "chat.completion",
+        "created": 1789322190,
+        "model": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constraint 1: Explain in exactly two sentences.\n    *   Constraint 2: No headings.\n\n2.  **Identify Key Scientific Concepts:**\n    *",
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": null
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-766d4701",
+        "usage": {
+          "prompt_tokens": 26,
+          "total_tokens": 90,
+          "completion_tokens": 64,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": null
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    }
+  ]
+}

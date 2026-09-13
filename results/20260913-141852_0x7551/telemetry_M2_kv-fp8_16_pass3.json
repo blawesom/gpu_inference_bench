@@ -1,0 +1,199 @@
+{
+  "n_samples": 14,
+  "duration_s": 13.0,
+  "mem_peak_gb": 25.17,
+  "mem_avg_gb": 25.17,
+  "util_avg_pct": 93.1,
+  "util_peak_pct": 100.0,
+  "power_avg_w": 295.7,
+  "power_peak_w": 301.0,
+  "energy_j": 3885.0,
+  "temp_avg_c": null,
+  "temp_peak_c": null,
+  "freq_avg_mhz": null,
+  "freq_peak_mhz": null,
+  "window": {
+    "aligned": true,
+    "reason": null,
+    "wall_s": 27.2,
+    "measured_window_s": 13.72,
+    "n_samples": 14,
+    "n_samples_full": 28
+  },
+  "energy_j_per_ktok": null,
+  "full_window": {
+    "power_avg_w": 217.4,
+    "power_peak_w": 301.0,
+    "energy_j": 5833.5
+  },
+  "samples": [
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 53.0,
+      "power_w": 152.0,
+      "t": 1789314697.0819614
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 3.0,
+      "power_w": 21.0,
+      "t": 1789314698.0837498
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 3.0,
+      "power_w": 16.0,
+      "t": 1789314699.080798
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 3.0,
+      "power_w": 16.0,
+      "t": 1789314700.0846646
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 3.0,
+      "power_w": 16.0,
+      "t": 1789314701.0811625
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 3.0,
+      "power_w": 15.0,
+      "t": 1789314702.083401
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 3.0,
+      "power_w": 15.0,
+      "t": 1789314703.0825562
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 87.0,
+      "power_w": 217.0,
+      "t": 1789314704.0821064
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 240.0,
+      "t": 1789314705.0799203
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 240.0,
+      "t": 1789314706.0788808
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 245.0,
+      "t": 1789314707.0799315
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 247.0,
+      "t": 1789314708.080606
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 258.0,
+      "t": 1789314709.0805488
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 250.0,
+      "t": 1789314710.080185
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 299.0,
+      "t": 1789314711.0830617
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 299.0,
+      "t": 1789314712.0835853
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 300.0,
+      "t": 1789314713.0811336
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 299.0,
+      "t": 1789314714.0804
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 299.0,
+      "t": 1789314715.0835812
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 300.0,
+      "t": 1789314716.0805688
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 300.0,
+      "t": 1789314717.080787
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 300.0,
+      "t": 1789314718.0805957
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 301.0,
+      "t": 1789314719.0827653
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 299.0,
+      "t": 1789314720.0819736
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 300.0,
+      "t": 1789314721.0816443
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 300.0,
+      "t": 1789314722.0825648
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 100.0,
+      "power_w": 289.0,
+      "t": 1789314723.0807405
+    },
+    {
+      "mem_used_gb": 25.17,
+      "util_pct": 3.0,
+      "power_w": 255.0,
+      "t": 1789314724.0829961
+    }
+  ]
+}

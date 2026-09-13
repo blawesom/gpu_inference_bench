@@ -1,0 +1,2405 @@
+{
+  "schema_version": 1,
+  "run_id": "20260909-210037_intel-r-arc-tm-pro-b70-graphics",
+  "workload": {
+    "dataset": "random",
+    "random_input_len": 512,
+    "random_output_len": 256,
+    "num_prompts": 50,
+    "num_warmups": 2,
+    "concurrency_levels": [
+      1,
+      4,
+      8,
+      16
+    ],
+    "seed": 42,
+    "temperature": 0.0,
+    "ignore_eos": true,
+    "backend": "openai-chat",
+    "endpoint": "/v1/chat/completions",
+    "percentile_metrics": "ttft,tpot,itl",
+    "metric_percentiles": "50,90,99",
+    "num_passes": 3,
+    "warmup_max_passes": 3,
+    "warmup_prompts": 8,
+    "token_check_threshold": 0.9
+  },
+  "common_server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "gpu_memory_utilization": 0.9,
+    "max_num_seqs": 16,
+    "trust_remote_code": true,
+    "flags": {
+      "no-enable-prefix-caching": true
+    }
+  },
+  "models": {
+    "M1": {
+      "id": "Qwen/Qwen3.5-9B",
+      "class": "dense-9b",
+      "format": "bf16",
+      "weights_gb": 19.3,
+      "max_model_len": 8192,
+      "configs": [
+        "baseline",
+        "kv-fp8",
+        "long-context",
+        "aiter-attn"
+      ]
+    },
+    "M2": {
+      "id": "openai/gpt-oss-20b",
+      "class": "moe-small",
+      "format": "mxfp4",
+      "weights_gb": 13.8,
+      "max_model_len": 8192,
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    },
+    "M3": {
+      "id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "class": "dense-27b",
+      "format": "awq4",
+      "weights_gb": 21.0,
+      "gpu_memory_utilization": 0.95,
+      "max_model_len": 2048,
+      "flags": {
+        "max-num-batched-tokens": 2048
+      },
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    },
+    "M4": {
+      "id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "class": "moe-35b-a3b",
+      "format": "awq4",
+      "weights_gb": 24.5,
+      "gpu_memory_utilization": 0.95,
+      "max_model_len": 2048,
+      "flags": {
+        "max-num-batched-tokens": 2048
+      },
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    }
+  },
+  "cells": [
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=238) INFO 09-09 19:01:16 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='Qwen/Qwen3.5-9B', speculative_config=None, tokenizer='Qwen/Qwen3.5-9B', skip_tokenizer"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M1_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_1_pass1.json",
+              "wall_time_s": 394.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_1_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_1_pass2.json",
+              "wall_time_s": 395.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_1_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_1_pass3.json",
+              "wall_time_s": 394.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_4_pass1.json",
+              "wall_time_s": 116.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_4_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_4_pass2.json",
+              "wall_time_s": 116.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_4_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_4_pass3.json",
+              "wall_time_s": 116.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_8_pass1.json",
+              "wall_time_s": 72.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_8_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_8_pass2.json",
+              "wall_time_s": 72.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_8_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_8_pass3.json",
+              "wall_time_s": 72.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_16_pass1.json",
+              "wall_time_s": 50.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_16_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_16_pass2.json",
+              "wall_time_s": 50.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_16_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_16_pass3.json",
+              "wall_time_s": 50.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M1_baseline_pass1.log",
+        "2": "server_M1_baseline_pass2.log",
+        "3": "server_M1_baseline_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=4190) INFO 09-09 19:44:33 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='Qwen/Qwen3.5-9B', speculative_config=None, tokenizer='Qwen/Qwen3.5-9B', skip_tokenize"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M1_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_1_pass1.json",
+              "wall_time_s": 397.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_1_pass2.json",
+              "wall_time_s": 397.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_kv-fp8_1_pass3.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_1_pass3.json",
+              "wall_time_s": 397.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_4_pass1.json",
+              "wall_time_s": 117.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_4_pass2.json",
+              "wall_time_s": 117.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_kv-fp8_4_pass3.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_4_pass3.json",
+              "wall_time_s": 117.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_8_pass1.json",
+              "wall_time_s": 73.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_8_pass2.json",
+              "wall_time_s": 72.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_kv-fp8_8_pass3.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_8_pass3.json",
+              "wall_time_s": 73.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_16_pass1.json",
+              "wall_time_s": 51.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_16_pass2.json",
+              "wall_time_s": 51.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_kv-fp8_16_pass3.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_16_pass3.json",
+              "wall_time_s": 51.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M1_kv-fp8_pass1.log",
+        "2": "server_M1_kv-fp8_pass2.log",
+        "3": "server_M1_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "long-context",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=8150) INFO 09-09 20:27:41 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='Qwen/Qwen3.5-9B', speculative_config=None, tokenizer='Qwen/Qwen3.5-9B', skip_tokenize"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M1_long-context_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_long-context_1_pass1.json",
+              "telemetry_json": "telemetry_M1_long-context_1_pass1.json",
+              "wall_time_s": 394.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_long-context_1_pass2.json",
+              "telemetry_json": "telemetry_M1_long-context_1_pass2.json",
+              "wall_time_s": 394.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_long-context_1_pass3.json",
+              "telemetry_json": "telemetry_M1_long-context_1_pass3.json",
+              "wall_time_s": 394.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_long-context_4_pass1.json",
+              "telemetry_json": "telemetry_M1_long-context_4_pass1.json",
+              "wall_time_s": 116.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_long-context_4_pass2.json",
+              "telemetry_json": "telemetry_M1_long-context_4_pass2.json",
+              "wall_time_s": 116.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_long-context_4_pass3.json",
+              "telemetry_json": "telemetry_M1_long-context_4_pass3.json",
+              "wall_time_s": 116.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_long-context_8_pass1.json",
+              "telemetry_json": "telemetry_M1_long-context_8_pass1.json",
+              "wall_time_s": 72.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_long-context_8_pass2.json",
+              "telemetry_json": "telemetry_M1_long-context_8_pass2.json",
+              "wall_time_s": 72.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_long-context_8_pass3.json",
+              "telemetry_json": "telemetry_M1_long-context_8_pass3.json",
+              "wall_time_s": 72.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_long-context_16_pass1.json",
+              "telemetry_json": "telemetry_M1_long-context_16_pass1.json",
+              "wall_time_s": 50.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_long-context_16_pass2.json",
+              "telemetry_json": "telemetry_M1_long-context_16_pass2.json",
+              "wall_time_s": 50.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_long-context_16_pass3.json",
+              "telemetry_json": "telemetry_M1_long-context_16_pass3.json",
+              "wall_time_s": 50.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M1_long-context_pass1.log",
+        "2": "server_M1_long-context_pass2.log",
+        "3": "server_M1_long-context_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "aiter-attn",
+      "status": "skipped",
+      "reason": "aiter-amd-only",
+      "server_flags": {},
+      "server_env": {},
+      "server_log": null,
+      "concurrency_results": {},
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M2",
+      "model_id": "openai/gpt-oss-20b",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=12143) INFO 09-09 21:10:24 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='openai/gpt-oss-20b', speculative_config=None, tokenizer='openai/gpt-oss-20b', skip_t"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M2_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_1_pass1.json",
+              "wall_time_s": 79.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2167,
+                "ratio": 0.169,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_1_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_1_pass2.json",
+              "wall_time_s": 79.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2167,
+                "ratio": 0.169,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_1_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_1_pass3.json",
+              "wall_time_s": 79.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2167,
+                "ratio": 0.169,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_4_pass1.json",
+              "wall_time_s": 36.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2022,
+                "ratio": 0.158,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_4_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_4_pass2.json",
+              "wall_time_s": 36.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2022,
+                "ratio": 0.158,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_4_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_4_pass3.json",
+              "wall_time_s": 36.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2022,
+                "ratio": 0.158,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_8_pass1.json",
+              "wall_time_s": 26.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2306,
+                "ratio": 0.18,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_8_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_8_pass2.json",
+              "wall_time_s": 26.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2306,
+                "ratio": 0.18,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_8_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_8_pass3.json",
+              "wall_time_s": 26.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2055,
+                "ratio": 0.161,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_16_pass1.json",
+              "wall_time_s": 21.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2148,
+                "ratio": 0.168,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_16_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_16_pass2.json",
+              "wall_time_s": 21.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1967,
+                "ratio": 0.154,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_16_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_16_pass3.json",
+              "wall_time_s": 21.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1969,
+                "ratio": 0.154,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M2_baseline_pass1.log",
+        "2": "server_M2_baseline_pass2.log",
+        "3": "server_M2_baseline_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M2",
+      "model_id": "openai/gpt-oss-20b",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=14954) INFO 09-09 21:24:03 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='openai/gpt-oss-20b', speculative_config=None, tokenizer='openai/gpt-oss-20b', skip_t"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M2_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_1_pass1.json",
+              "wall_time_s": 74.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2148,
+                "ratio": 0.168,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_1_pass2.json",
+              "wall_time_s": 74.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2148,
+                "ratio": 0.168,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_1_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_1_pass3.json",
+              "wall_time_s": 74.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2148,
+                "ratio": 0.168,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_4_pass1.json",
+              "wall_time_s": 35.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2067,
+                "ratio": 0.161,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_4_pass2.json",
+              "wall_time_s": 34.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1881,
+                "ratio": 0.147,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_4_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_4_pass3.json",
+              "wall_time_s": 33.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2037,
+                "ratio": 0.159,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_8_pass1.json",
+              "wall_time_s": 25.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1973,
+                "ratio": 0.154,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_8_pass2.json",
+              "wall_time_s": 24.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1840,
+                "ratio": 0.144,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_8_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_8_pass3.json",
+              "wall_time_s": 25.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1973,
+                "ratio": 0.154,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_16_pass1.json",
+              "wall_time_s": 20.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1911,
+                "ratio": 0.149,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_16_pass2.json",
+              "wall_time_s": 19.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1841,
+                "ratio": 0.144,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_16_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_16_pass3.json",
+              "wall_time_s": 20.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1945,
+                "ratio": 0.152,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M2_kv-fp8_pass1.log",
+        "2": "server_M2_kv-fp8_pass2.log",
+        "3": "server_M2_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M3",
+      "model_id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=17726) INFO 09-09 21:36:39 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.8-27B-AWQ-INT4', speculative_config=None, tokenizer='cyankiwi/Qwen3.8"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M3_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_1_pass1.json",
+              "wall_time_s": 498.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_baseline_1_pass2.json",
+              "telemetry_json": "telemetry_M3_baseline_1_pass2.json",
+              "wall_time_s": 498.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_baseline_1_pass3.json",
+              "telemetry_json": "telemetry_M3_baseline_1_pass3.json",
+              "wall_time_s": 498.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_4_pass1.json",
+              "wall_time_s": 161.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_baseline_4_pass2.json",
+              "telemetry_json": "telemetry_M3_baseline_4_pass2.json",
+              "wall_time_s": 161.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_baseline_4_pass3.json",
+              "telemetry_json": "telemetry_M3_baseline_4_pass3.json",
+              "wall_time_s": 161.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_8_pass1.json",
+              "wall_time_s": 107.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_baseline_8_pass2.json",
+              "telemetry_json": "telemetry_M3_baseline_8_pass2.json",
+              "wall_time_s": 107.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_baseline_8_pass3.json",
+              "telemetry_json": "telemetry_M3_baseline_8_pass3.json",
+              "wall_time_s": 107.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_16_pass1.json",
+              "wall_time_s": 85.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_baseline_16_pass2.json",
+              "telemetry_json": "telemetry_M3_baseline_16_pass2.json",
+              "wall_time_s": 85.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_baseline_16_pass3.json",
+              "telemetry_json": "telemetry_M3_baseline_16_pass3.json",
+              "wall_time_s": 85.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M3_baseline_pass1.log",
+        "2": "server_M3_baseline_pass2.log",
+        "3": "server_M3_baseline_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M3",
+      "model_id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=22143) INFO 09-09 22:33:10 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.8-27B-AWQ-INT4', speculative_config=None, tokenizer='cyankiwi/Qwen3.8"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M3_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_1_pass1.json",
+              "wall_time_s": 504.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_1_pass2.json",
+              "wall_time_s": 504.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_1_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_1_pass3.json",
+              "wall_time_s": 504.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_4_pass1.json",
+              "wall_time_s": 163.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_4_pass2.json",
+              "wall_time_s": 163.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_4_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_4_pass3.json",
+              "wall_time_s": 163.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_8_pass1.json",
+              "wall_time_s": 108.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_8_pass2.json",
+              "wall_time_s": 108.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_8_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_8_pass3.json",
+              "wall_time_s": 108.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_16_pass1.json",
+              "wall_time_s": 86.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_16_pass2.json",
+              "wall_time_s": 86.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_16_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_16_pass3.json",
+              "wall_time_s": 86.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M3_kv-fp8_pass1.log",
+        "2": "server_M3_kv-fp8_pass2.log",
+        "3": "server_M3_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M4",
+      "model_id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=26621) INFO 09-09 23:30:01 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit', speculative_config=None, tokenizer='cyankiwi/Qwe"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M4_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_1_pass1.json",
+              "wall_time_s": 313.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_1_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_1_pass2.json",
+              "wall_time_s": 290.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_1_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_1_pass3.json",
+              "wall_time_s": 292.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_4_pass1.json",
+              "wall_time_s": 91.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_4_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_4_pass2.json",
+              "wall_time_s": 85.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_4_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_4_pass3.json",
+              "wall_time_s": 86.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_8_pass1.json",
+              "wall_time_s": 55.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_8_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_8_pass2.json",
+              "wall_time_s": 53.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_8_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_8_pass3.json",
+              "wall_time_s": 53.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_16_pass1.json",
+              "wall_time_s": 41.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_16_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_16_pass2.json",
+              "wall_time_s": 40.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_16_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_16_pass3.json",
+              "wall_time_s": 41.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M4_baseline_pass1.log",
+        "2": "server_M4_baseline_pass2.log",
+        "3": "server_M4_baseline_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    },
+    {
+      "model": "M4",
+      "model_id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=30479) INFO 09-10 00:05:08 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit', speculative_config=None, tokenizer='cyankiwi/Qwe"
+          ],
+          "triton_fallback": null,
+          "backend_override": null
+        }
+      },
+      "server_log": "server_M4_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_1_pass1.json",
+              "wall_time_s": 313.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_1_pass2.json",
+              "wall_time_s": 296.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_1_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_1_pass3.json",
+              "wall_time_s": 288.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_4_pass1.json",
+              "wall_time_s": 90.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_4_pass2.json",
+              "wall_time_s": 87.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_4_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_4_pass3.json",
+              "wall_time_s": 85.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_8_pass1.json",
+              "wall_time_s": 55.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_8_pass2.json",
+              "wall_time_s": 54.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_8_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_8_pass3.json",
+              "wall_time_s": 54.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_16_pass1.json",
+              "wall_time_s": 41.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_16_pass2.json",
+              "wall_time_s": 41.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_16_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_16_pass3.json",
+              "wall_time_s": 41.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M4_kv-fp8_pass1.log",
+        "2": "server_M4_kv-fp8_pass2.log",
+        "3": "server_M4_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "Intel(R) Arc(TM) Pro B70 Graphics"
+    }
+  ]
+}

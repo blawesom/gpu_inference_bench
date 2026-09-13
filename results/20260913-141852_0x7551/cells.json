@@ -1,0 +1,2053 @@
+{
+  "schema_version": 1,
+  "run_id": "20260913-141852_0x7551",
+  "workload": {
+    "dataset": "random",
+    "random_input_len": 512,
+    "random_output_len": 256,
+    "num_prompts": 50,
+    "num_warmups": 2,
+    "concurrency_levels": [
+      1,
+      4,
+      8,
+      16
+    ],
+    "seed": 42,
+    "temperature": 0.0,
+    "ignore_eos": true,
+    "backend": "openai-chat",
+    "endpoint": "/v1/chat/completions",
+    "percentile_metrics": "ttft,tpot,itl",
+    "metric_percentiles": "50,90,99",
+    "num_passes": 3,
+    "warmup_max_passes": 3,
+    "warmup_prompts": 8,
+    "token_check_threshold": 0.9
+  },
+  "common_server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "gpu_memory_utilization": 0.9,
+    "max_num_seqs": 16,
+    "trust_remote_code": true,
+    "flags": {
+      "no-enable-prefix-caching": true
+    }
+  },
+  "models": {
+    "M1": {
+      "id": "Qwen/Qwen3.5-9B",
+      "class": "dense-9b",
+      "format": "bf16",
+      "weights_gb": 19.3,
+      "max_model_len": 8192,
+      "configs": [
+        "baseline",
+        "kv-fp8",
+        "long-context",
+        "aiter-attn"
+      ]
+    },
+    "M2": {
+      "id": "openai/gpt-oss-20b",
+      "class": "moe-small",
+      "format": "mxfp4",
+      "weights_gb": 13.8,
+      "max_model_len": 8192,
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    },
+    "M3": {
+      "id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "class": "dense-27b",
+      "format": "awq4",
+      "weights_gb": 21.0,
+      "gpu_memory_utilization": 0.95,
+      "max_model_len": 2048,
+      "flags": {
+        "max-num-batched-tokens": 2048
+      },
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    },
+    "M4": {
+      "id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "class": "moe-35b-a3b",
+      "format": "awq4",
+      "weights_gb": 24.5,
+      "gpu_memory_utilization": 0.95,
+      "max_model_len": 2048,
+      "flags": {
+        "max-num-batched-tokens": 2048
+      },
+      "configs": [
+        "baseline",
+        "kv-fp8"
+      ]
+    }
+  },
+  "cells": [
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=268) INFO 09-13 12:22:41 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='Qwen/Qwen3.5-9B', speculative_config=None, tokenizer='Qwen/Qwen3.5-9B', skip_tokenizer"
+          ],
+          "triton_fallback": "(EngineCore pid=268) WARNING 09-13 12:24:56 [chunked_prefill_paged_decode.py:433] Cannot use ROCm custom paged attention kernel, falling back to Triton implementation.",
+          "backend_override": "(EngineCore pid=268) INFO 09-13 12:22:48 [rocm.py:703] Found incompatible backend(s) [TURBOQUANT] with AttentionType.DECODER. Overriding with ROCM_ATTN out of potential backends: ['ROCM_ATTN', 'TRITON"
+        }
+      },
+      "server_log": "server_M1_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_1_pass1.json",
+              "wall_time_s": 383.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_1_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_1_pass2.json",
+              "wall_time_s": 708.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_1_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_1_pass3.json",
+              "wall_time_s": 708.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_4_pass1.json",
+              "wall_time_s": 115.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_4_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_4_pass2.json",
+              "wall_time_s": 115.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_4_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_4_pass3.json",
+              "wall_time_s": 201.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_8_pass1.json",
+              "wall_time_s": 88.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_8_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_8_pass2.json",
+              "wall_time_s": 88.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_8_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_8_pass3.json",
+              "wall_time_s": 139.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M1_baseline_16_pass1.json",
+              "wall_time_s": 59.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_baseline_16_pass2.json",
+              "telemetry_json": "telemetry_M1_baseline_16_pass2.json",
+              "wall_time_s": 59.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M1_baseline_16_pass3.json",
+              "telemetry_json": "telemetry_M1_baseline_16_pass3.json",
+              "wall_time_s": 91.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M1_baseline_pass1.log",
+        "2": "server_M1_baseline_pass2.log",
+        "3": "server_M1_baseline_pass3.log"
+      },
+      "aiter_diag": "diag_aiter_M1_baseline.json",
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=5276) INFO 09-13 13:27:02 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='Qwen/Qwen3.5-9B', speculative_config=None, tokenizer='Qwen/Qwen3.5-9B', skip_tokenize"
+          ],
+          "triton_fallback": "(EngineCore pid=5276) WARNING 09-13 13:28:54 [chunked_prefill_paged_decode.py:433] Cannot use ROCm custom paged attention kernel, falling back to Triton implementation.",
+          "backend_override": "(EngineCore pid=5276) INFO 09-13 13:27:08 [rocm.py:703] Found incompatible backend(s) [TURBOQUANT] with AttentionType.DECODER. Overriding with ROCM_ATTN out of potential backends: ['ROCM_ATTN', 'TRITO"
+        }
+      },
+      "server_log": "server_M1_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_1_pass1.json",
+              "wall_time_s": 741.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_1_pass2.json",
+              "wall_time_s": 741.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_4_pass1.json",
+              "wall_time_s": 123.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_4_pass2.json",
+              "wall_time_s": 123.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_8_pass1.json",
+              "wall_time_s": 93.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_8_pass2.json",
+              "wall_time_s": 93.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M1_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_16_pass1.json",
+              "wall_time_s": 62.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M1_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M1_kv-fp8_16_pass2.json",
+              "wall_time_s": 63.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M1_kv-fp8_pass1.log",
+        "2": "server_M1_kv-fp8_pass2.log",
+        "3": "server_M1_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "long-context",
+      "status": "failed",
+      "reason": "pass1-failed:engine-startup",
+      "server_flags": {
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16
+      },
+      "server_log": "server_M1_long-context_pass1.log",
+      "server_env": {},
+      "concurrency_results": {},
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M1_long-context_pass1.log"
+      },
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M1",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "config": "aiter-attn",
+      "status": "failed",
+      "reason": "pass1-failed:engine-startup",
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16
+      },
+      "server_log": "server_M1_aiter-attn_pass1.log",
+      "server_env": {
+        "VLLM_ROCM_USE_AITER": "1",
+        "ROCM_AITER_UNIFIED_ATTN": "1"
+      },
+      "concurrency_results": {},
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M1_aiter-attn_pass1.log"
+      },
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M2",
+      "model_id": "openai/gpt-oss-20b",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=9492) INFO 09-13 14:21:14 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='openai/gpt-oss-20b', speculative_config=None, tokenizer='openai/gpt-oss-20b', skip_to"
+          ],
+          "triton_fallback": null,
+          "backend_override": "(EngineCore pid=9492) INFO 09-13 14:21:14 [rocm.py:703] Found incompatible backend(s) [ROCM_ATTN, TURBOQUANT] with AttentionType.DECODER. Overriding with TRITON_ATTN out of potential backends: ['TRITO"
+        }
+      },
+      "server_log": "server_M2_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_1_pass1.json",
+              "wall_time_s": 505.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1980,
+                "ratio": 0.155,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_1_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_1_pass2.json",
+              "wall_time_s": 234.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1980,
+                "ratio": 0.155,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_1_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_1_pass3.json",
+              "wall_time_s": 504.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1980,
+                "ratio": 0.155,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_4_pass1.json",
+              "wall_time_s": 185.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2466,
+                "ratio": 0.193,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_4_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_4_pass2.json",
+              "wall_time_s": 79.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1932,
+                "ratio": 0.151,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_4_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_4_pass3.json",
+              "wall_time_s": 79.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2156,
+                "ratio": 0.168,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference",
+              "JIT compilation during inference",
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_8_pass1.json",
+              "wall_time_s": 93.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2091,
+                "ratio": 0.163,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_8_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_8_pass2.json",
+              "wall_time_s": 35.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2386,
+                "ratio": 0.186,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_8_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_8_pass3.json",
+              "wall_time_s": 35.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2412,
+                "ratio": 0.188,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M2_baseline_16_pass1.json",
+              "wall_time_s": 66.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2143,
+                "ratio": 0.167,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_baseline_16_pass2.json",
+              "telemetry_json": "telemetry_M2_baseline_16_pass2.json",
+              "wall_time_s": 28.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2090,
+                "ratio": 0.163,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_baseline_16_pass3.json",
+              "telemetry_json": "telemetry_M2_baseline_16_pass3.json",
+              "wall_time_s": 28.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2215,
+                "ratio": 0.173,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M2_baseline_pass1.log",
+        "2": "server_M2_baseline_pass2.log",
+        "3": "server_M2_baseline_pass3.log"
+      },
+      "aiter_diag": "diag_aiter_M2_baseline.json",
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M2",
+      "model_id": "openai/gpt-oss-20b",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=13691) INFO 09-13 15:07:46 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='openai/gpt-oss-20b', speculative_config=None, tokenizer='openai/gpt-oss-20b', skip_t"
+          ],
+          "triton_fallback": null,
+          "backend_override": "(EngineCore pid=13691) INFO 09-13 15:07:46 [rocm.py:703] Found incompatible backend(s) [ROCM_ATTN, TURBOQUANT] with AttentionType.DECODER. Overriding with TRITON_ATTN out of potential backends: ['TRIT"
+        }
+      },
+      "server_log": "server_M2_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_1_pass1.json",
+              "wall_time_s": 460.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1922,
+                "ratio": 0.15,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_1_pass2.json",
+              "wall_time_s": 458.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1922,
+                "ratio": 0.15,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_1_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_1_pass3.json",
+              "wall_time_s": 457.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1922,
+                "ratio": 0.15,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_4_pass1.json",
+              "wall_time_s": 76.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2053,
+                "ratio": 0.16,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_4_pass2.json",
+              "wall_time_s": 76.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2053,
+                "ratio": 0.16,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_4_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_4_pass3.json",
+              "wall_time_s": 74.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1911,
+                "ratio": 0.149,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference",
+              "JIT compilation during inference",
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_8_pass1.json",
+              "wall_time_s": 35.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1851,
+                "ratio": 0.145,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_8_pass2.json",
+              "wall_time_s": 34.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2013,
+                "ratio": 0.157,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_8_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_8_pass3.json",
+              "wall_time_s": 34.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1912,
+                "ratio": 0.149,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M2_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_16_pass1.json",
+              "wall_time_s": 28.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2271,
+                "ratio": 0.177,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M2_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_16_pass2.json",
+              "wall_time_s": 27.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 1738,
+                "ratio": 0.136,
+                "flag": "output-token-shortfall"
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M2_kv-fp8_16_pass3.json",
+              "telemetry_json": "telemetry_M2_kv-fp8_16_pass3.json",
+              "wall_time_s": 27.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 2083,
+                "ratio": 0.163,
+                "flag": "output-token-shortfall"
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M2_kv-fp8_pass1.log",
+        "2": "server_M2_kv-fp8_pass2.log",
+        "3": "server_M2_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M3",
+      "model_id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=17861) INFO 09-13 15:52:21 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.8-27B-AWQ-INT4', speculative_config=None, tokenizer='cyankiwi/Qwen3.8"
+          ],
+          "triton_fallback": "(EngineCore pid=17861) WARNING 09-13 15:55:05 [chunked_prefill_paged_decode.py:433] Cannot use ROCm custom paged attention kernel, falling back to Triton implementation.",
+          "backend_override": "(EngineCore pid=17861) INFO 09-13 15:52:28 [rocm.py:703] Found incompatible backend(s) [TURBOQUANT] with AttentionType.DECODER. Overriding with ROCM_ATTN out of potential backends: ['ROCM_ATTN', 'TRIT"
+        }
+      },
+      "server_log": "server_M3_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_1_pass1.json",
+              "wall_time_s": 479.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_4_pass1.json",
+              "wall_time_s": 233.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_8_pass1.json",
+              "wall_time_s": 244.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M3_baseline_16_pass1.json",
+              "wall_time_s": 158.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M3_baseline_pass1.log",
+        "2": "server_M3_baseline_pass2.log"
+      },
+      "aiter_diag": "diag_aiter_M3_baseline.json",
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M3",
+      "model_id": "cyankiwi/Qwen3.8-27B-AWQ-INT4",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=19876) INFO 09-13 16:20:08 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.8-27B-AWQ-INT4', speculative_config=None, tokenizer='cyankiwi/Qwen3.8"
+          ],
+          "triton_fallback": "(EngineCore pid=19876) WARNING 09-13 16:22:53 [chunked_prefill_paged_decode.py:433] Cannot use ROCm custom paged attention kernel, falling back to Triton implementation.",
+          "backend_override": "(EngineCore pid=19876) INFO 09-13 16:20:15 [rocm.py:703] Found incompatible backend(s) [TURBOQUANT] with AttentionType.DECODER. Overriding with ROCM_ATTN out of potential backends: ['ROCM_ATTN', 'TRIT"
+        }
+      },
+      "server_log": "server_M3_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_1_pass1.json",
+              "wall_time_s": 547.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_1_pass2.json",
+              "wall_time_s": 986.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_1_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_1_pass3.json",
+              "wall_time_s": 546.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference",
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_4_pass1.json",
+              "wall_time_s": 251.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_4_pass2.json",
+              "wall_time_s": 250.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_4_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_4_pass3.json",
+              "wall_time_s": 250.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_8_pass1.json",
+              "wall_time_s": 255.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_8_pass2.json",
+              "wall_time_s": 253.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_8_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_8_pass3.json",
+              "wall_time_s": 254.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M3_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_16_pass1.json",
+              "wall_time_s": 163.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M3_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_16_pass2.json",
+              "wall_time_s": 161.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M3_kv-fp8_16_pass3.json",
+              "telemetry_json": "telemetry_M3_kv-fp8_16_pass3.json",
+              "wall_time_s": 162.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M3_kv-fp8_pass1.log",
+        "2": "server_M3_kv-fp8_pass2.log",
+        "3": "server_M3_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M4",
+      "model_id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "config": "baseline",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=26310) INFO 09-13 17:53:30 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit', speculative_config=None, tokenizer='cyankiwi/Qwe"
+          ],
+          "triton_fallback": "(EngineCore pid=26310) WARNING 09-13 17:56:04 [chunked_prefill_paged_decode.py:433] Cannot use ROCm custom paged attention kernel, falling back to Triton implementation.",
+          "backend_override": "(EngineCore pid=26310) INFO 09-13 17:53:37 [rocm.py:703] Found incompatible backend(s) [TURBOQUANT] with AttentionType.DECODER. Overriding with ROCM_ATTN out of potential backends: ['ROCM_ATTN', 'TRIT"
+        }
+      },
+      "server_log": "server_M4_baseline_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_1_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_1_pass1.json",
+              "wall_time_s": 946.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_1_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_1_pass2.json",
+              "wall_time_s": 194.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_1_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_1_pass3.json",
+              "wall_time_s": 809.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference",
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_4_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_4_pass1.json",
+              "wall_time_s": 301.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_4_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_4_pass2.json",
+              "wall_time_s": 97.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_4_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_4_pass3.json",
+              "wall_time_s": 97.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_8_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_8_pass1.json",
+              "wall_time_s": 195.0,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_8_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_8_pass2.json",
+              "wall_time_s": 79.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_8_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_8_pass3.json",
+              "wall_time_s": 87.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_baseline_16_pass1.json",
+              "telemetry_json": "telemetry_M4_baseline_16_pass1.json",
+              "wall_time_s": 57.8,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_baseline_16_pass2.json",
+              "telemetry_json": "telemetry_M4_baseline_16_pass2.json",
+              "wall_time_s": 58.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_baseline_16_pass3.json",
+              "telemetry_json": "telemetry_M4_baseline_16_pass3.json",
+              "wall_time_s": 57.6,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M4_baseline_pass1.log",
+        "2": "server_M4_baseline_pass2.log",
+        "3": "server_M4_baseline_pass3.log"
+      },
+      "aiter_diag": "diag_aiter_M4_baseline.json",
+      "weights_removed": false,
+      "gpu": "0x7551"
+    },
+    {
+      "model": "M4",
+      "model_id": "cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit",
+      "config": "kv-fp8",
+      "status": "ok",
+      "reason": null,
+      "server_flags": {
+        "max_model_len": 2048,
+        "gpu_memory_utilization": 0.95,
+        "max_num_seqs": 16,
+        "kv_cache_dtype": "fp8",
+        "effective_prefix_caching": false,
+        "attention_evidence": {
+          "aiter_lines": [
+            "(EngineCore pid=31606) INFO 09-13 19:05:10 [core.py:122] Initializing a V1 LLM engine (v0.28.0) with config: model='cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit', speculative_config=None, tokenizer='cyankiwi/Qwe"
+          ],
+          "triton_fallback": "(EngineCore pid=31606) WARNING 09-13 19:07:47 [chunked_prefill_paged_decode.py:433] Cannot use ROCm custom paged attention kernel, falling back to Triton implementation.",
+          "backend_override": "(EngineCore pid=31606) INFO 09-13 19:05:17 [rocm.py:703] Found incompatible backend(s) [TURBOQUANT] with AttentionType.DECODER. Overriding with ROCM_ATTN out of potential backends: ['ROCM_ATTN', 'TRIT"
+        }
+      },
+      "server_log": "server_M4_kv-fp8_pass1.log",
+      "server_env": {},
+      "concurrency_results": {
+        "1": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_1_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_1_pass1.json",
+              "wall_time_s": 235.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_1_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_1_pass2.json",
+              "wall_time_s": 482.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_1_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_1_pass3.json",
+              "wall_time_s": 236.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 2,
+            "stable": true,
+            "compilations": [
+              "JIT compilation during inference",
+              "JIT compilation during inference"
+            ]
+          }
+        },
+        "4": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_4_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_4_pass1.json",
+              "wall_time_s": 109.5,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_4_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_4_pass2.json",
+              "wall_time_s": 109.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_4_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_4_pass3.json",
+              "wall_time_s": 109.3,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "8": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_8_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_8_pass1.json",
+              "wall_time_s": 85.9,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_8_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_8_pass2.json",
+              "wall_time_s": 86.7,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_8_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_8_pass3.json",
+              "wall_time_s": 86.4,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        },
+        "16": {
+          "status": "ok",
+          "reason": null,
+          "passes": [
+            {
+              "pass": 1,
+              "bench_json": "bench_M4_kv-fp8_16_pass1.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_16_pass1.json",
+              "wall_time_s": 62.2,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 2,
+              "bench_json": "bench_M4_kv-fp8_16_pass2.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_16_pass2.json",
+              "wall_time_s": 62.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            },
+            {
+              "pass": 3,
+              "bench_json": "bench_M4_kv-fp8_16_pass3.json",
+              "telemetry_json": "telemetry_M4_kv-fp8_16_pass3.json",
+              "wall_time_s": 62.1,
+              "status": "ok",
+              "reason": null,
+              "jit_during_bench": false,
+              "token_check": {
+                "expected": 12800,
+                "actual": 12800,
+                "ratio": 1.0
+              }
+            }
+          ],
+          "warmup": {
+            "max_passes": 3,
+            "passes": 1,
+            "stable": true,
+            "compilations": []
+          }
+        }
+      },
+      "protocol": {
+        "num_passes": 3,
+        "warmup_max_passes": 3,
+        "prefix_caching": "disabled (--no-enable-prefix-caching)"
+      },
+      "server_logs": {
+        "1": "server_M4_kv-fp8_pass1.log",
+        "2": "server_M4_kv-fp8_pass2.log",
+        "3": "server_M4_kv-fp8_pass3.log"
+      },
+      "weights_removed": false,
+      "gpu": "0x7551"
+    }
+  ]
+}

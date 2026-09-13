@@ -1,0 +1,142 @@
+{
+  "tag": "M2_baseline",
+  "concurrency": 1,
+  "num_requests": 3,
+  "responses": [
+    {
+      "index": 0,
+      "raw": {
+        "id": "chatcmpl-a7757431c80d8daa",
+        "object": "chat.completion",
+        "created": 1789309953,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write a concise but complete explanation of how a Transformer model encodes positional information in the absence of explicit position embeddings, and compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim for around four paragraphs. No code, no bullet points.\n\nWe need to explain that Transformers are permutation invariant, so they need positional encoding. In absence of explicit position embeddings, they can use relative positional encodings or self-attention biases. But the question: \"in the absence of explicit position embeddings\" means we need to explain how a Transformer can encode positional information without explicit position embeddings. That could refer to using relative position biases or using the attention mechanism itself to encode positions via relative distances. For example, the attention score includes a bias term that depends on relative position. Or using the \"relative position representation\" like in Transformer-XL or T5. Also, the \"absolute position embeddings\" are learned vectors added to token embeddings. In contrast, RoPE uses sinusoidal rotations applied to query and key vectors, effectively encoding relative positions via complex exponentials. We need to compare length generalization: learned absolute positions are limited to the maximum length seen"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-d7a3d639",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 1,
+      "raw": {
+        "id": "chatcmpl-8a7bbb5f241880ad",
+        "object": "chat.completion",
+        "created": 1789309970,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write a concise but complete explanation of how a Transformer model encodes positional information in the absence of explicit position embeddings, and compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim for around four paragraphs. No code, no bullet points.\n\nWe need to explain that Transformers are permutation invariant, so they need positional encoding. In absence of explicit position embeddings, they can use relative positional encodings or self-attention biases. But the question: \"in the absence of explicit position embeddings\" means we need to explain how a Transformer can encode positional information without explicit position embeddings. That could refer to using relative position biases or using the attention mechanism itself to encode positions via relative distances. For example, the attention score includes a bias term that depends on relative position. Or using the \"relative position representation\" like in Transformer-XL or T5. Also, the \"absolute position embeddings\" are learned vectors added to token embeddings. In contrast, RoPE uses sinusoidal rotations applied to query and key vectors, effectively encoding relative positions via complex exponentials. We need to compare length generalization: learned absolute positions are limited to the maximum length seen"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-d7a3d639",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    },
+    {
+      "index": 2,
+      "raw": {
+        "id": "chatcmpl-bbb84e74261e854a",
+        "object": "chat.completion",
+        "created": 1789309987,
+        "model": "openai/gpt-oss-20b",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "refusal": null,
+              "annotations": null,
+              "audio": null,
+              "function_call": null,
+              "reasoning": "We need to write a concise but complete explanation of how a Transformer model encodes positional information in the absence of explicit position embeddings, and compare rotary position embeddings (RoPE) with learned absolute positions in terms of length generalization. Use math notation where helpful, but keep prose accessible to grad-level ML. Aim for around four paragraphs. No code, no bullet points.\n\nWe need to explain that Transformers are permutation invariant, so they need positional encoding. In absence of explicit position embeddings, they can use relative positional encodings or self-attention biases. But the question: \"in the absence of explicit position embeddings\" means we need to explain how a Transformer can encode positional information without explicit position embeddings. That could refer to using relative position biases or using the attention mechanism itself to encode positions via relative distances. For example, the attention score includes a bias term that depends on relative position. Or using the \"relative position representation\" like in Transformer-XL or T5. Also, the \"absolute position embeddings\" are learned vectors added to token embeddings. In contrast, RoPE uses sinusoidal rotations applied to query and key vectors, effectively encoding relative positions via complex exponentials. We need to compare length generalization: learned absolute positions are limited to the maximum length seen"
+            },
+            "logprobs": null,
+            "finish_reason": "length",
+            "stop_reason": null,
+            "token_ids": null,
+            "routed_experts": null
+          }
+        ],
+        "service_tier": null,
+        "system_fingerprint": "vllm-0.28.0-d7a3d639",
+        "usage": {
+          "prompt_tokens": 149,
+          "total_tokens": 405,
+          "completion_tokens": 256,
+          "prompt_tokens_details": null,
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "prompt_logprobs": null,
+        "prompt_token_ids": null,
+        "prompt_text": null,
+        "kv_transfer_params": null,
+        "ec_transfer_params": null,
+        "metrics": null
+      }
+    }
+  ]
+}
