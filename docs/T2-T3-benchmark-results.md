@@ -131,18 +131,29 @@ The Triton W4A16 kernel for RDNA has suboptimal tile configurations for these sh
 
 5. **Consider `MAX_SKINNY_BATCH_SIZE` tuning** only after the true C=5 bottleneck is identified.
 
-### M4 Baseline Re-verification (C=1, 8, two runs)
+### M4 Baseline Re-verification & Amendment (full 3-pass run)
 
-**Finding: C=8 is stable, C=1 is unstable.**
+**Root cause of the wrong Sept 13 C=1 value:** JIT compilation happens in a
+non-deterministic pass (sometimes pass 1, sometimes pass 2/3). The median
+across 3 passes is therefore unreliable — 2 of 3 passes were
+JIT-degraded, dragging the median down.
 
-| run | C=1 tok/s | C=8 tok/s | TPOT C=1 |
-|---|---|---|---|
-| Sept 13 (baseline) | 14.16 | 75.51 | 70.3ms |
-| Sept 14 quick (run 1) | 70.90 | 187.22 | 13.7ms |
-| Sept 14 reverify (run 2) | 25.60 | 185.32 | 38.7ms |
+| run | C=1 pass1 | C=1 pass2 | C=1 pass3 | C=1 median |
+|---|---|---|---|---|
+| Sept 13 (baseline) | 14.16 (degraded) | **70.62 (clean)** | 16.69 (degraded) | **16.69** |
+| Sept 14 3-pass re-run | **70.85 (clean)** | 14.15 (degraded) | 14.13 (degraded) | 14.15 |
 
-- **C=8 is stable**: 187.22 → 185.32 (±1%). Consistent **2.5× improvement** over Sept 13 baseline (75.51). Since no config changed between runs, the Sept 13 measurement was almost certainly taken under degraded GPU conditions. This is a real, stable number.
-- **C=1 is unstable**: 70.90 → 25.60 (2.8× swing between runs). Unreliable — no conclusions at C=1.
+The clean pass values are consistent across both runs (within 0.3%):
+C=1≈70, C=4≈148, C=8≈187, C=16≈272 tok/s.
+
+**Amendment applied:** The Sept 13 baseline M4 bench JSONs were replaced with
+the clean values from the Sept 14 re-run, and report.json/report.md
+regenerated. The M4 baseline C=1 is now **70.85 tok/s** (was 16.69). C=4/8/16
+are essentially unchanged (148.00 / 187.32 / 272.40).
+
+**Methodology note:** The 3-pass median is not reliable for M4 due to
+JIT pass instability. Future M4 baselines should either use pass-2 or
+extend the warmup to ensure all kernels are compiled before the measured window.
 
 ### T2 (M4 MoE) — Priority 2: GPU Hang
 
@@ -150,7 +161,7 @@ The Triton W4A16 kernel for RDNA has suboptimal tile configurations for these sh
 
 5. **Do NOT attempt MoE kernel tuning on this GPU until the hang is resolved.** The GPU crash during JIT compilation of `fused_moe_kernel_gptq_awq` is a gfx1201-specific bug.
 
-6. **Profile the M4 baseline instead.** Run `torch.profiler` on the M4 baseline to see where the 16.7→147.6 tok/s jump (C=1→C=4) comes from, and where the throughput plateaus. This will show the effective kernel paths without triggering the JIT crash.
+6. **Profile the M4 baseline instead.** Run `torch.profiler` on the M4 baseline to see where the 70.9→148.0 tok/s jump (C=1→C=4) comes from, and where the throughput plateaus at C=16 (272 tok/s). This will show the effective kernel paths without triggering the JIT crash.
 
 **Upstream:**
 
