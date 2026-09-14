@@ -131,6 +131,19 @@ The Triton W4A16 kernel for RDNA has suboptimal tile configurations for these sh
 
 5. **Consider `MAX_SKINNY_BATCH_SIZE` tuning** only after the true C=5 bottleneck is identified.
 
+### M4 Baseline Re-verification (C=1, 8, two runs)
+
+**Finding: C=8 is stable, C=1 is unstable.**
+
+| run | C=1 tok/s | C=8 tok/s | TPOT C=1 |
+|---|---|---|---|
+| Sept 13 (baseline) | 14.16 | 75.51 | 70.3ms |
+| Sept 14 quick (run 1) | 70.90 | 187.22 | 13.7ms |
+| Sept 14 reverify (run 2) | 25.60 | 185.32 | 38.7ms |
+
+- **C=8 is stable**: 187.22 → 185.32 (±1%). Consistent **2.5× improvement** over Sept 13 baseline (75.51). Since no config changed between runs, the Sept 13 measurement was almost certainly taken under degraded GPU conditions. This is a real, stable number.
+- **C=1 is unstable**: 70.90 → 25.60 (2.8× swing between runs). Unreliable — no conclusions at C=1.
+
 ### T2 (M4 MoE) — Priority 2: GPU Hang
 
 **Immediate:**
